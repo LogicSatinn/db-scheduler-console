@@ -31,6 +31,10 @@ public class ExecutionRepository {
 
     public record LiveCounts(long scheduled, long due, long running, long failing) {}
 
+    public String tableName() {
+        return table;
+    }
+
     public Page<ExecutionRow> page(ExecutionFilter f, Instant now) {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
