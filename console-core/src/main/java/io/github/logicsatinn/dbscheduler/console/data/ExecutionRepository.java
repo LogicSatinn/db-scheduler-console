@@ -59,6 +59,14 @@ public class ExecutionRepository {
         return rows.stream().findFirst();
     }
 
+    public java.util.Optional<Instant> nextExecutionTime(String taskName) {
+        List<Timestamp> result = jdbc.query(
+                "SELECT MIN(execution_time) AS next_time FROM " + table
+                        + " WHERE task_name = ? AND picked = ?",
+                (rs, i) -> rs.getTimestamp("next_time"), taskName, false);
+        return result.stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
+    }
+
     public List<String> distinctTaskNames() {
         return jdbc.queryForList(
                 "SELECT DISTINCT task_name FROM " + table + " ORDER BY task_name", String.class);

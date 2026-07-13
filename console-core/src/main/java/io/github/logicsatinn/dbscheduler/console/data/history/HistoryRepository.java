@@ -111,6 +111,14 @@ public class HistoryRepository {
         return jdbc.query(sql, ROW_MAPPER, params.toArray());
     }
 
+    public java.util.Optional<HistoryEntry> latestForTask(String taskName) {
+        String sql = "SELECT " + COLUMNS + " FROM " + TABLE + " WHERE task_name = ?"
+                + " ORDER BY started_at DESC, id DESC" + dialect.paginationClause();
+        List<Object> params = new ArrayList<>(List.of(taskName));
+        params.addAll(Arrays.asList(dialect.paginationParams(0, 1)));
+        return jdbc.query(sql, ROW_MAPPER, params.toArray()).stream().findFirst();
+    }
+
     public int purgeOlderThan(Instant cutoff) {
         return jdbc.update("DELETE FROM " + TABLE + " WHERE started_at < ?",
                 Timestamp.from(cutoff));
