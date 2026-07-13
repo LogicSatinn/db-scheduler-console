@@ -43,6 +43,16 @@ With the trailing `;` the file is one statement (the separator is stripped befor
 Oracle never sees the `;`) and `OracleContractTest` passes. This affects a test fixture only — no
 production SQL, and no shipped migration, changed.
 
+### 3. `ExecutionActions.InstanceRef.parse` uses `substring(i + SEP.length())`, not `substring(i + 1)`
+
+**Plan text:** Task 8, Step 3 — `return new InstanceRef(composite.substring(0, i), composite.substring(i + 1));`
+
+**Why it was necessary:** the separator is `"::"` (two characters), so `i + 1` leaves a leading `:`
+on the instance id and `parse("t::i")` yields `InstanceRef("t", ":i")`. That breaks the plan's own
+`instanceRefRoundTrip` test, which asserts `parse(ref.composite()).equals(ref)`. Advancing by
+`SEP.length()` is the minimal fix and preserves the documented "split on the first `::`" contract
+(instance ids may themselves contain `::`).
+
 ## Known gaps
 
 ### SQL Server contract test is not verified on this machine (Apple Silicon / arm64)
