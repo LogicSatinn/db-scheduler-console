@@ -40,12 +40,13 @@ db-scheduler-console is a Spring Boot library that provides a JobRunr-grade dash
 | History | In scope for v1, via library-owned table + listener |
 | Databases | All db-scheduler-supported |
 | Architecture | Shared core + thin per-Boot-generation starters |
+| Build tool | Gradle (Kotlin DSL) |
 | Rendering | JTE precompiled templates + vendored htmx |
 | Name | db-scheduler-console |
 
 ## Architecture
 
-Maven multi-module project:
+Gradle (Kotlin DSL) multi-module project:
 
 ```
 db-scheduler-console/
@@ -64,7 +65,7 @@ db-scheduler-console/
 
 - `console-core` compiles against Spring Framework 6 and db-scheduler ≥ v16. Spring MVC annotations are stable across Framework 6→7, so the same core runs under both Boot generations; CI proves it with both example apps.
 - Starters contain only auto-configuration (bean wiring, `@ConditionalOnBean(Scheduler.class)`, property binding). No logic.
-- JTE templates are precompiled by the Maven plugin: no runtime template engine configuration, no interference with the host app's view resolvers, only the small `jte-runtime` dependency at runtime.
+- JTE templates are precompiled by the JTE Gradle plugin: no runtime template engine configuration, no interference with the host app's view resolvers, only the small `jte-runtime` dependency at runtime.
 - Auto-configuration activates only when a db-scheduler `Scheduler` bean exists and `db-scheduler-console.enabled=true` (default). Otherwise the library is inert.
 
 ## Data Layer
@@ -194,6 +195,6 @@ Prime directive: **the dashboard must never hurt the host app.**
 ## Future (explicitly deferred)
 
 - Framework-agnostic core extraction + Ktor/Javalin adapters
-- Maven Central publication, semver policy, public docs site
+- Maven Central publication (via the Central Portal with the `com.vanniktech.maven.publish` Gradle plugin on `console-core` and both starters; needs a verified namespace, e.g. `io.github.logicsatinn`), semver policy, public docs site
 - SSE-based live updates replacing polling
 - Per-task metrics (p95 duration trends), alerting hooks
