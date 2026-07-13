@@ -53,6 +53,42 @@ on the instance id and `parse("t::i")` yields `InstanceRef("t", ":i")`. That bre
 `SEP.length()` is the minimal fix and preserves the documented "split on the first `::`" contract
 (instance ids may themselves contain `::`).
 
+### 4. `-parameters` compiler flag added in the root `build.gradle.kts` (`allprojects`)
+
+**Plan text:** Task 1's build files set no compiler args.
+
+**Why it was necessary:** Spring MVC resolves `@PathVariable`/`@RequestParam` names by reflection.
+The Spring Boot Gradle plugin adds `-parameters` for you, but the plan deliberately does not apply
+that plugin to any module (Task 1, Step 8 explains why). Without the flag,
+`StaticAssetsController.asset(@PathVariable String file)` fails at request time:
+
+```
+IllegalArgumentException: Name for argument of type [java.lang.String] not specified,
+and parameter name information not available via reflection.
+Ensure that the compiler uses the '-parameters' flag.
+```
+
+Applied once in `allprojects` so every module behaves like a Boot-plugin build. No dependency or
+API change.
+
+### 5. `layout.jte` uses a JTE "smart attribute" for `hx-headers` instead of `@if` around the attribute
+
+**Plan text:** Task 10, Step 8 — `<body @if(ctx.csrfHeaderJson() != null)hx-headers='${ctx.csrfHeaderJson()}'@endif>`
+
+**Why it was necessary:** JTE's `ContentType.Html` rejects `@if` in an attribute-*name* position and
+fails the build (which is the behaviour the plan wants — template errors must fail the build):
+
+```
+gg.jte.TemplateException: Failed to compile layout.jte, error at line 13:
+Illegal HTML attribute name @if(ctx.csrfHeaderJson()! @if expressions in HTML attribute names are
+not allowed. ... smart attributes will do just that
+```
+
+The replacement is the mechanism JTE's own error message points at:
+`<body hx-headers="${ctx.csrfHeaderJson()}">`. JTE omits an attribute entirely when its value
+expression is `null`, so the rendered output is identical to the plan's intent: the `hx-headers`
+attribute appears only when a CSRF token is present.
+
 ## Known gaps
 
 ### SQL Server contract test is not verified on this machine (Apple Silicon / arm64)

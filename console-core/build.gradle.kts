@@ -1,10 +1,17 @@
 plugins {
     `java-library`
+    alias(libs.plugins.jte)
 }
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(17) }
     withSourcesJar()
+}
+
+jte {
+    sourceDirectory.set(file("src/main/jte").toPath())
+    contentType.set(gg.jte.ContentType.Html)
+    generate()
 }
 
 dependencies {
