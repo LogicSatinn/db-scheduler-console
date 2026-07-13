@@ -28,9 +28,34 @@ public class OverviewController {
 
     @GetMapping({"", "/", "/overview"})
     public ResponseEntity<String> overview(HttpServletRequest request) {
-        return templates.page("pages/overview.jte", Map.of(
-                "ctx", ctxFactory.page("overview", request),
+        return templates.page("pages/overview.jte", model(ctxFactory.page("overview", request)));
+    }
+
+    @GetMapping("/fragments/overview-tiles")
+    public ResponseEntity<String> tilesFragment() {
+        return templates.page("fragments/tiles.jte", Map.of(
+                "tiles", stats.tiles(), "historyAvailable", stats.historyAvailable()));
+    }
+
+    @GetMapping("/fragments/overview-chart")
+    public ResponseEntity<String> chartFragment() {
+        return templates.page("fragments/chart.jte", Map.of(
+                "chart", ChartVm.of(stats.throughputLast24h())));
+    }
+
+    @GetMapping("/fragments/overview-recent")
+    public ResponseEntity<String> recentFragment(HttpServletRequest request) {
+        return templates.page("fragments/recentFailures.jte", Map.of(
+                "failures", stats.historyAvailable() ? history.recentFailures(5) : java.util.List.of(),
+                "basePath", ctxFactory.page("overview", request).basePath()));
+    }
+
+    private Map<String, Object> model(PageCtx ctx) {
+        return Map.of(
+                "ctx", ctx,
                 "tiles", stats.tiles(),
-                "historyAvailable", stats.historyAvailable()));
+                "historyAvailable", stats.historyAvailable(),
+                "chart", ChartVm.of(stats.throughputLast24h()),
+                "failures", stats.historyAvailable() ? history.recentFailures(5) : java.util.List.of());
     }
 }
