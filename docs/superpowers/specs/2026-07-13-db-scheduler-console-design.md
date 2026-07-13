@@ -72,7 +72,7 @@ db-scheduler-console/
 
 ### Live state
 
-Live execution state is read directly from db-scheduler's `scheduled_executions` table via JDBC (`JdbcTemplate` on the same `DataSource` db-scheduler uses). The `SchedulerClient` API is not used for reads — it cannot express SQL-level filtering, sorting, and pagination.
+Live execution state is read directly from db-scheduler's task table (default `scheduled_tasks`; the configured `db-scheduler.table-name` is honored) via JDBC (`JdbcTemplate` on the same `DataSource` db-scheduler uses). The `SchedulerClient` API is not used for reads — it cannot express SQL-level filtering, sorting, and pagination.
 
 - Queries stay ANSI where possible; the few dialect-specific parts (pagination syntax) live behind a single `Dialect` interface with one implementation per supported database.
 - Dialect is auto-detected from `DataSource` metadata; unknown databases disable the dashboard with a single clear ERROR log line — the host app boots normally.
@@ -100,7 +100,7 @@ dsc_execution_history (
 ```
 
 - Populated by a listener implementing db-scheduler's `SchedulerListener` API, using `ExecutionComplete` (result, cause, timeStarted, timeDone) for outcome, duration, and stacktrace.
-- Wiring: auto-registered by our starter. Exact mechanism (listener bean pickup by the db-scheduler Spring Boot starter vs. explicit registration) is verified against the pinned db-scheduler version during implementation planning; both paths are auto-configured, no user code either way.
+- Wiring: db-scheduler's Spring Boot starter auto-registers any `SchedulerListener` beans found in the application context (verified against v16.12.0); our starter simply declares the listener bean — no user code.
 - **The listener never throws into task execution.** Any history-write failure is caught, WARN-logged, and dropped. The insert is a single statement on the existing DataSource — cheap enough to run synchronously on execution completion.
 - Migration scripts ship inside the jar as plain SQL, one per database, applied by the user via their own tool (Flyway/Liquibase/manual) — the same convention db-scheduler itself uses.
 - If the history table is missing: live views work normally; history views degrade to a setup page showing the correct `CREATE TABLE` script for the detected database.
@@ -189,7 +189,7 @@ Prime directive: **the dashboard must never hurt the host app.**
 |---|---|
 | Java | 17+ |
 | Spring Boot | 3.x (starter), 4.x (starter) |
-| db-scheduler | ≥ 16.x (pinned minimum verified during implementation) |
+| db-scheduler | 16.12.0+ |
 | Databases | PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, H2 |
 
 ## Future (explicitly deferred)
