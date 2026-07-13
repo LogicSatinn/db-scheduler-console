@@ -7,6 +7,7 @@
 @param java.util.List<String> taskNames
 @param java.time.Instant now
 @param String queryBase
+@param String refreshUrl
 @template.layout(ctx = ctx, title = "Executions", content = @`
     <h1>Executions</h1>
     <form class="filters"
@@ -42,5 +43,5 @@
         <input type="hidden" name="size" value="${filter.pageSize()}">
         <button type="submit">Apply</button>
     </form>
-    @template.fragments.executionsTable(ctx = ctx, page = page, filter = filter, now = now, queryBase = queryBase)
+    @template.fragments.executionsTable(ctx = ctx, page = page, filter = filter, now = now, queryBase = queryBase, refreshUrl = refreshUrl)
 `)
