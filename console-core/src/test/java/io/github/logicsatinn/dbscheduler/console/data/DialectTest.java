@@ -2,7 +2,6 @@ package io.github.logicsatinn.dbscheduler.console.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -43,7 +42,6 @@ class DialectTest {
     }
 
     @Test
-    @Disabled("until Task 4")
     void migrationResourcesExistOnClasspath() {
         for (Dialect d : Dialect.values()) {
             assertThat(getClass().getClassLoader().getResource(d.migrationResource()))
