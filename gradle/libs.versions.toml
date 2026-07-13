@@ -1,0 +1,32 @@
+[versions]
+dbScheduler = "16.12.0"
+springBoot3 = "3.5.16"
+springBoot4 = "4.0.7"
+jte = "3.2.4"
+jsoup = "1.18.3"
+testcontainers = "1.21.3"
+awaitility = "4.2.2"
+
+[libraries]
+dbScheduler = { module = "com.github.kagkarlsson:db-scheduler", version.ref = "dbScheduler" }
+dbSchedulerBoot3Starter = { module = "com.github.kagkarlsson:db-scheduler-spring-boot-starter", version.ref = "dbScheduler" }
+dbSchedulerBoot4Starter = { module = "com.github.kagkarlsson:db-scheduler-spring-boot-4-starter", version.ref = "dbScheduler" }
+springBoot3Bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot3" }
+springBoot4Bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot4" }
+jteRuntime = { module = "gg.jte:jte-runtime", version.ref = "jte" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+testcontainersJunit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainersPostgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainersMysql = { module = "org.testcontainers:mysql", version.ref = "testcontainers" }
+testcontainersMariadb = { module = "org.testcontainers:mariadb", version.ref = "testcontainers" }
+testcontainersMssqlserver = { module = "org.testcontainers:mssqlserver", version.ref = "testcontainers" }
+testcontainersOracleFree = { module = "org.testcontainers:oracle-free", version.ref = "testcontainers" }
+jdbcPostgresql = { module = "org.postgresql:postgresql", version = "42.7.7" }
+jdbcMysql = { module = "com.mysql:mysql-connector-j", version = "9.3.0" }
+jdbcMariadb = { module = "org.mariadb.jdbc:mariadb-java-client", version = "3.5.4" }
+jdbcMssql = { module = "com.microsoft.sqlserver:mssql-jdbc", version = "12.10.1.jre11" }
+jdbcOracle = { module = "com.oracle.database.jdbc:ojdbc11", version = "23.8.0.25.04" }
+
+[plugins]
+jte = { id = "gg.jte.gradle", version.ref = "jte" }
