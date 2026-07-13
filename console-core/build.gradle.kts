@@ -33,6 +33,7 @@ dependencies {
     testImplementation(libs.testcontainersMariadb)
     testImplementation(libs.testcontainersMssqlserver)
     testImplementation(libs.testcontainersOracleFree)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly(libs.jdbcPostgresql)
     testRuntimeOnly(libs.jdbcMysql)
     testRuntimeOnly(libs.jdbcMariadb)
