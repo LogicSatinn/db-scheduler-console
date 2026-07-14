@@ -42,10 +42,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@AutoConfiguration(
-        afterName = "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration")
+@AutoConfiguration(afterName = {
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
+        "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"})
 @ConditionalOnClass(Scheduler.class)
-@ConditionalOnBean(Scheduler.class)
+@ConditionalOnBean({Scheduler.class, DataSource.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnProperty(prefix = "db-scheduler-console", name = "enabled",
         havingValue = "true", matchIfMissing = true)
@@ -68,9 +69,14 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     ExecutionRepository dbSchedulerConsoleExecutionRepository(DataSource dataSource,
-            DbSchedulerProperties dbSchedulerProperties, ConsoleAvailability availability) {
-        return new ExecutionRepository(dataSource,
-                dbSchedulerProperties.getTableName(), availability.dialectOrFallback());
+            ObjectProvider<DbSchedulerProperties> dbSchedulerProperties,
+            ConsoleAvailability availability) {
+        // Apps that build their own Scheduler have no DbSchedulerProperties bean.
+        String tableName = dbSchedulerProperties.stream()
+                .map(DbSchedulerProperties::getTableName)
+                .findFirst()
+                .orElse(ExecutionRepository.DEFAULT_TABLE_NAME);
+        return new ExecutionRepository(dataSource, tableName, availability.dialectOrFallback());
     }
 
     @Bean

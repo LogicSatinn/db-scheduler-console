@@ -1,9 +1,13 @@
 package io.github.logicsatinn.dbscheduler.console.boot3;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration;
+import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
 import com.github.kagkarlsson.scheduler.task.helper.RecurringTask;
+import io.github.logicsatinn.dbscheduler.console.ConsoleAvailability;
 import io.github.logicsatinn.dbscheduler.console.ConsoleProperties;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.service.ConsoleSchedulerListener;
@@ -18,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 class DbSchedulerConsoleAutoConfigurationTest {
 
@@ -82,6 +88,37 @@ class DbSchedulerConsoleAutoConfigurationTest {
     }
 
     @Test
+    void backsOffWithoutDataSource() {
+        new WebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(DbSchedulerConsoleAutoConfiguration.class))
+                .withUserConfiguration(OwnSchedulerConfig.class)
+                .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
+                    assertThat(ctx).doesNotHaveBean(ConsoleAvailability.class);
+                    assertThat(ctx).doesNotHaveBean(ExecutionRepository.class);
+                    assertThat(ctx).doesNotHaveBean(OverviewController.class);
+                });
+    }
+
+    @Test
+    void activeWithoutDbSchedulerPropertiesUsingDefaultTableName() {
+        new WebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        DataSourceAutoConfiguration.class,
+                        DbSchedulerConsoleAutoConfiguration.class))
+                .withUserConfiguration(OwnSchedulerConfig.class)
+                .withPropertyValues(
+                        "spring.datasource.url=jdbc:h2:mem:noschedulerprops;DB_CLOSE_DELAY=-1",
+                        "spring.datasource.driver-class-name=org.h2.Driver")
+                .run(ctx -> {
+                    assertThat(ctx).doesNotHaveBean(DbSchedulerProperties.class);
+                    assertThat(ctx).hasSingleBean(OverviewController.class);
+                    assertThat(ctx.getBean(ExecutionRepository.class).tableName())
+                            .isEqualTo("scheduled_tasks");
+                });
+    }
+
+    @Test
     void propertiesBind() {
         runner.withPropertyValues(
                 "db-scheduler-console.read-only=true",
@@ -93,5 +130,14 @@ class DbSchedulerConsoleAutoConfigurationTest {
                   assertThat(props.getHistory().getRetention()).isEqualTo(java.time.Duration.ofDays(7));
                   assertThat(props.getPollingInterval()).isEqualTo(java.time.Duration.ofSeconds(10));
               });
+    }
+
+    /** An app that builds its own Scheduler without the db-scheduler Boot starter. */
+    @Configuration(proxyBeanMethods = false)
+    static class OwnSchedulerConfig {
+        @Bean
+        Scheduler scheduler() {
+            return mock(Scheduler.class);
+        }
     }
 }

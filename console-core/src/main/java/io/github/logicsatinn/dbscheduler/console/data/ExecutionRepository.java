@@ -15,6 +15,9 @@ import org.springframework.jdbc.core.RowMapper;
 
 public class ExecutionRepository {
 
+    /** db-scheduler's own default when {@code db-scheduler.table-name} is not configured. */
+    public static final String DEFAULT_TABLE_NAME = "scheduled_tasks";
+
     private static final String COLUMNS =
             "task_name, task_instance, task_data, execution_time, picked, picked_by, "
             + "last_success, last_failure, consecutive_failures, last_heartbeat, version";
