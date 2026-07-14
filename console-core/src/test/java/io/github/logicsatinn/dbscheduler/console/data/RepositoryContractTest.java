@@ -1,6 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter;
@@ -82,6 +83,47 @@ public abstract class RepositoryContractTest {
         var counts = executions.counts(NOW);
         assertThat(counts.running()).isEqualTo(1);
         assertThat(counts.failing()).isEqualTo(1);
+    }
+
+    @Test
+    void executionLookupsAndBatchedNextRuns() {
+        insertExecution("email", "order-1", NOW.plus(2, ChronoUnit.HOURS), false, 0);
+        insertExecution("email", "order-2", NOW.plus(1, ChronoUnit.HOURS), false, 0);
+        insertExecution("report", "r-1", NOW.plus(30, ChronoUnit.MINUTES), false, 0);
+        insertExecution("picked-only", "p-1", NOW, true, 0);
+
+        assertThat(executions.find("email", "order-1")).isPresent();
+        assertThat(executions.find("email", "nope")).isEmpty();
+        assertThat(executions.distinctTaskNames())
+                .containsExactly("email", "picked-only", "report");
+
+        assertThat(executions.nextExecutionTime("email"))
+                .contains(NOW.plus(1, ChronoUnit.HOURS));
+        assertThat(executions.nextExecutionTime("picked-only")).isEmpty();
+
+        assertThat(executions.nextExecutionTimes()).containsOnly(
+                entry("email", NOW.plus(1, ChronoUnit.HOURS)),
+                entry("report", NOW.plus(30, ChronoUnit.MINUTES)));
+    }
+
+    @Test
+    void historyLatestPerTask() {
+        history.insert(new HistoryEntry(0, "email", "1", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(90), NOW.minusSeconds(88), 2000,
+                "java.lang.RuntimeException", "older", "stack", "node-1"));
+        history.insert(new HistoryEntry(0, "email", "2", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000, null, null, null, "node-1"));
+        history.insert(new HistoryEntry(0, "report", "3", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minusSeconds(10), NOW.minusSeconds(9), 1000, null, null, null, "node-1"));
+
+        assertThat(history.latestForTask("email")).get()
+                .extracting(HistoryEntry::instanceId).isEqualTo("2");
+        assertThat(history.latestForTask("absent")).isEmpty();
+
+        var latest = history.latestPerTask();
+        assertThat(latest).containsOnlyKeys("email", "report");
+        assertThat(latest.get("email").instanceId()).isEqualTo("2");
+        assertThat(latest.get("report").instanceId()).isEqualTo("3");
     }
 
     @Test
