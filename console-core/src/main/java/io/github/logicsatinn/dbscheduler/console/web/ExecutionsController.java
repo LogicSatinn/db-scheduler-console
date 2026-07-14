@@ -101,9 +101,8 @@ public class ExecutionsController {
         model.put("dataPreview", taskData.render(row.get().taskData()));
         model.put("historyEntries", stats.historyAvailable()
                 ? history.forInstance(task, id, 50) : List.of());
-        model.put("selfUrl", ctxFactory.page("executions", request).basePath() + "/execution?task="
-                + java.net.URLEncoder.encode(task, java.nio.charset.StandardCharsets.UTF_8)
-                + "&id=" + java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8));
+        model.put("selfUrl", ctxFactory.page("executions", request).basePath()
+                + "/execution?task=" + Fmt.url(task) + "&id=" + Fmt.url(id));
         return templates.page("pages/executionDetail.jte", model);
     }
 

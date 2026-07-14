@@ -56,6 +56,18 @@ class OverviewControllerTest {
     }
 
     @Test
+    void recentFailureLinkIsUrlEncoded() throws Exception {
+        history.insert(new HistoryEntry(0, "email", "order+A&B C", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(100), NOW.minusSeconds(99), 1000,
+                "java.lang.RuntimeException", "smtp down", "stack", "n1"));
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/overview"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(doc.select("#recent-failures td a").attr("href"))
+                .isEqualTo("/db-scheduler-console/execution?task=email&id=order%2BA%26B%20C");
+    }
+
+    @Test
     void overviewShowsTilesChartAndRecentFailures() throws Exception {
         seedHistory();
         var body = mvc.perform(get("/db-scheduler-console/overview"))

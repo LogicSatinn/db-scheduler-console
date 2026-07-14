@@ -34,7 +34,8 @@ class RecurringControllerTest {
                 .addScript("db-scheduler-console/migrations/h2.sql")
                 .build();
         List<Task<?>> known = List.of(
-                Tasks.recurring("cleanup", FixedDelay.ofHours(1)).execute((i, c) -> {}));
+                Tasks.recurring("cleanup", FixedDelay.ofHours(1)).execute((i, c) -> {}),
+                Tasks.recurring("purge&sweep old", FixedDelay.ofHours(1)).execute((i, c) -> {}));
         var service = new RecurringTasksService(known,
                 new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2),
                 new HistoryRepository(ds, Dialect.H2));
@@ -49,7 +50,15 @@ class RecurringControllerTest {
     void listsKnownTasks() throws Exception {
         var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/recurring"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertThat(doc.select("table.data tbody tr")).hasSize(1);
+        assertThat(doc.select("table.data tbody tr")).hasSize(2);
         assertThat(doc.select("tbody").text()).contains("cleanup").contains("Recurring");
+    }
+
+    @Test
+    void historyLinkIsUrlEncoded() throws Exception {
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/recurring"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(doc.select("tbody a").eachAttr("href"))
+                .contains("/db-scheduler-console/history?task=purge%26sweep%20old");
     }
 }

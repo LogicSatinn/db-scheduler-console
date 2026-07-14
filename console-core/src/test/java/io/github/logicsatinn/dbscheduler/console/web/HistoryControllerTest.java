@@ -21,6 +21,8 @@ class HistoryControllerTest {
 
     static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
 
+    HistoryRepository repo;
+
     MockMvc mvcFor(boolean withHistoryTable) {
         var builder = new EmbeddedDatabaseBuilder()
                 .setType(EmbeddedDatabaseType.H2)
@@ -30,7 +32,7 @@ class HistoryControllerTest {
             builder.addScript("db-scheduler-console/migrations/h2.sql");
         }
         DataSource ds = builder.build();
-        var repo = new HistoryRepository(ds, Dialect.H2);
+        repo = new HistoryRepository(ds, Dialect.H2);
         if (withHistoryTable) {
             repo.insert(new HistoryEntry(0, "email", "1", HistoryEntry.Outcome.FAILED,
                     NOW.minusSeconds(60), NOW.minusSeconds(58), 2000,
@@ -60,6 +62,18 @@ class HistoryControllerTest {
         var text = Jsoup.parse(mvc.perform(get("/db-scheduler-console/history?q=smtp"))
                 .andReturn().getResponse().getContentAsString());
         assertThat(text.select("#history-region tbody tr")).hasSize(1);
+    }
+
+    @Test
+    void instanceLinkIsUrlEncoded() throws Exception {
+        var mvc = mvcFor(true);
+        repo.insert(new HistoryEntry(0, "email", "order+A&B C", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minusSeconds(10), NOW.minusSeconds(9), 1000, null, null, null, "n1"));
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/history?q=order"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(doc.select("#history-region tbody td a").attr("href"))
+                .isEqualTo("/db-scheduler-console/execution?task=email&id=order%2BA%26B%20C");
     }
 
     @Test

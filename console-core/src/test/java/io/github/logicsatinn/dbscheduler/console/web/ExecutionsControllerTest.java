@@ -11,6 +11,7 @@ import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -109,6 +110,23 @@ class ExecutionsControllerTest {
         assertThat(doc.select("pre.data").text()).contains("orderId");
         assertThat(doc.select("details.stack pre").text()).contains("the-stack-trace");
         assertThat(doc.text()).contains("SCHEDULED");
+    }
+
+    @Test
+    void detailLinkRoundTripsForIdentifiersNeedingEncoding() throws Exception {
+        String task = "email&send";
+        String id = "order+A&B C";
+        insert(task, id, NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+
+        var list = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String href = list.select("#executions-region tbody td a").attr("href");
+        assertThat(href).isEqualTo(
+                "/db-scheduler-console/execution?task=email%26send&id=order%2BA%26B%20C");
+
+        var detail = Jsoup.parse(mvc.perform(get(URI.create(href)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(detail.select("h1").text()).contains(task).contains(id);
     }
 
     @Test

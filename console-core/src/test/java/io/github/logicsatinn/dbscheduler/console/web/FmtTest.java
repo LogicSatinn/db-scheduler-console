@@ -17,4 +17,13 @@ class FmtTest {
     void nullInstantIsDash() {
         assertThat(Fmt.ts(null)).isEqualTo("—");
     }
+
+    @Test
+    void urlEncodesQueryStringValues() {
+        assertThat(Fmt.url("order-1")).isEqualTo("order-1");
+        assertThat(Fmt.url("order+A&B")).isEqualTo("order%2BA%26B");
+        assertThat(Fmt.url("order A")).isEqualTo("order%20A");
+        assertThat(Fmt.url("a/b?c=d#e")).isEqualTo("a%2Fb%3Fc%3Dd%23e");
+        assertThat(Fmt.url(null)).isEmpty();
+    }
 }

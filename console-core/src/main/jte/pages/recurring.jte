@@ -1,3 +1,4 @@
+@import io.github.logicsatinn.dbscheduler.console.web.Fmt
 @param io.github.logicsatinn.dbscheduler.console.web.PageCtx ctx
 @param java.util.List<io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService.Row> rows
 @template.layout(ctx = ctx, title = "Recurring tasks", content = @`
@@ -22,7 +23,7 @@
                                 <span class="muted">—</span>
                             @endif
                         </td>
-                        <td><a href="${ctx.basePath()}/history?task=${row.taskName()}">history</a></td>
+                        <td><a href="${ctx.basePath()}/history?task=${Fmt.url(row.taskName())}">history</a></td>
                     </tr>
                 @endfor
                 </tbody>

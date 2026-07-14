@@ -1,3 +1,4 @@
+@import io.github.logicsatinn.dbscheduler.console.web.Fmt
 @param io.github.logicsatinn.dbscheduler.console.web.PageCtx ctx
 @param io.github.logicsatinn.dbscheduler.console.data.Page<io.github.logicsatinn.dbscheduler.console.data.ExecutionRow> page
 @param io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter filter
@@ -43,7 +44,7 @@
             <tr>
                 <td><input type="checkbox" name="ref" value="${row.taskName()}::${row.instanceId()}" form="bulk-form"></td>
                 <td>${row.taskName()}</td>
-                <td><a href="${base}/execution?task=${row.taskName()}&id=${row.instanceId()}">${row.instanceId()}</a></td>
+                <td><a href="${base}/execution?task=${Fmt.url(row.taskName())}&id=${Fmt.url(row.instanceId())}">${row.instanceId()}</a></td>
                 <td><span class="state ${state.name().toLowerCase()}">${state.name()}</span></td>
                 <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.executionTime())}</td>
                 <td class="num">${row.consecutiveFailures()}</td>

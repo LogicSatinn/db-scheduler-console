@@ -1,3 +1,4 @@
+@import io.github.logicsatinn.dbscheduler.console.web.Fmt
 @param io.github.logicsatinn.dbscheduler.console.web.PageCtx ctx
 @param io.github.logicsatinn.dbscheduler.console.data.Page<io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry> page
 @param io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter filter
@@ -12,7 +13,7 @@
         @for(var h : page.items())
             <tr>
                 <td>${h.taskName()}</td>
-                <td><a href="${ctx.basePath()}/execution?task=${h.taskName()}&id=${h.instanceId()}">${h.instanceId()}</a></td>
+                <td><a href="${ctx.basePath()}/execution?task=${Fmt.url(h.taskName())}&id=${Fmt.url(h.instanceId())}">${h.instanceId()}</a></td>
                 <td><span class="state ${h.outcome().name().toLowerCase()}">${h.outcome().name()}</span></td>
                 <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(h.startedAt())}</td>
                 <td class="num">${io.github.logicsatinn.dbscheduler.console.web.Fmt.duration(h.durationMs())}</td>
