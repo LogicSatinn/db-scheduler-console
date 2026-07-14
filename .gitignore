@@ -3,3 +3,16 @@ build/
 .idea/
 *.iml
 .DS_Store
+
+### Other files ###
+.claude
+.codex
+AGENTS.md
+NOTES.md
+docs
+.settings/
+.classpath
+.project
+.factorypath
+.vscode/
+out/

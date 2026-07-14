@@ -30,3 +30,4 @@ jdbcOracle = { module = "com.oracle.database.jdbc:ojdbc11", version = "23.8.0.25
 
 [plugins]
 jte = { id = "gg.jte.gradle", version.ref = "jte" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version = "0.37.0" }

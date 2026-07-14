@@ -1,5 +1,16 @@
 plugins {
     `java-library`
+    alias(libs.plugins.mavenPublish)
+}
+
+mavenPublishing {
+    pom {
+        name.set("db-scheduler Console Spring Boot 3 Starter")
+        description.set(
+            "Spring Boot 3 starter for the db-scheduler web console: auto-configures " +
+                "the dashboard on top of db-scheduler's Spring Boot integration."
+        )
+    }
 }
 
 java {

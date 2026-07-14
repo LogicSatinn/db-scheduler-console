@@ -1,6 +1,17 @@
 plugins {
     `java-library`
     alias(libs.plugins.jte)
+    alias(libs.plugins.mavenPublish)
+}
+
+mavenPublishing {
+    pom {
+        name.set("db-scheduler Console Core")
+        description.set(
+            "Core module of the db-scheduler web console: repositories, services, " +
+                "controllers, and the server-rendered dashboard UI."
+        )
+    }
 }
 
 java {
