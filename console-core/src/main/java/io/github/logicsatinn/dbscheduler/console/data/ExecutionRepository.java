@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -17,6 +18,10 @@ public class ExecutionRepository {
 
     /** db-scheduler's own default when {@code db-scheduler.table-name} is not configured. */
     public static final String DEFAULT_TABLE_NAME = "scheduled_tasks";
+
+    /** A bare identifier, optionally schema-qualified. */
+    private static final Pattern TABLE_NAME =
+            Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?$");
 
     private static final String COLUMNS =
             "task_name, task_instance, task_data, execution_time, picked, picked_by, "
@@ -28,8 +33,22 @@ public class ExecutionRepository {
 
     public ExecutionRepository(DataSource dataSource, String tableName, Dialect dialect) {
         this.jdbc = new JdbcTemplate(dataSource);
-        this.table = tableName;
+        this.table = validateTableName(tableName);
         this.dialect = dialect;
+    }
+
+    /**
+     * The table name is concatenated into every query, so it is the one identifier a
+     * deployment can inject into our SQL. Fail fast at startup rather than quote per dialect.
+     */
+    private static String validateTableName(String tableName) {
+        if (tableName == null || !TABLE_NAME.matcher(tableName).matches()) {
+            throw new IllegalArgumentException(
+                    "db-scheduler.table-name must be a plain SQL identifier, optionally"
+                    + " schema-qualified (e.g. scheduled_tasks or myschema.scheduled_tasks),"
+                    + " but was: " + tableName);
+        }
+        return tableName;
     }
 
     public record LiveCounts(long scheduled, long due, long running, long failing) {}

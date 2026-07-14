@@ -1,6 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -98,6 +99,31 @@ class ExecutionRepositoryTest {
         var desc = repo.page(new ExecutionFilter(null, null, null, null, null,
                 0, 10, SortColumn.EXECUTION_TIME, true), NOW);
         assertThat(desc.items().get(0).instanceId()).isEqualTo("i-24");
+    }
+
+    @Test
+    void acceptsPlainAndSchemaQualifiedTableNames() {
+        assertThat(new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2).tableName())
+                .isEqualTo("scheduled_tasks");
+        assertThat(new ExecutionRepository(ds, "myschema.scheduled_tasks", Dialect.H2).tableName())
+                .isEqualTo("myschema.scheduled_tasks");
+        assertThat(new ExecutionRepository(ds, "_Tasks2", Dialect.H2).tableName())
+                .isEqualTo("_Tasks2");
+    }
+
+    @Test
+    void rejectsTableNamesThatAreNotPlainIdentifiers() {
+        for (String bad : List.of(
+                "tasks; DROP TABLE x", "tasks--", "", "   ", "sched uled", "2tasks",
+                "a.b.c", "tasks'", "sched\"tasks")) {
+            assertThatThrownBy(() -> new ExecutionRepository(ds, bad, Dialect.H2))
+                    .as("table name %s", bad)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("db-scheduler.table-name");
+        }
+        assertThatThrownBy(() -> new ExecutionRepository(ds, null, Dialect.H2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("db-scheduler.table-name");
     }
 
     @Test
