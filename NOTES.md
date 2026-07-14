@@ -89,6 +89,48 @@ The replacement is the mechanism JTE's own error message points at:
 expression is `null`, so the rendered output is identical to the plan's intent: the `hx-headers`
 attribute appears only when a CSRF token is present.
 
+## Review-fix pass (2026-07-14)
+
+Seven verified findings from an external review were fixed, one commit each, TDD throughout.
+What changed, beyond the literal instructions:
+
+### 6. `Fmt.url` encodes spaces as `%20`, not URLEncoder's `+`
+
+`URLEncoder.encode` is `application/x-www-form-urlencoded`, which maps a space to `+` and a
+literal `+` to `%2B`. That decodes correctly in a servlet container's query string, but `+` is
+only *conventionally* a space there, and it is wrong in any other URL component. `Fmt.url`
+therefore post-processes `+` to `%20`, which every decoder reads as a space. This also keeps
+the helper honest under MockMvc, whose `UriUtils.decode` does not translate `+` to a space —
+a plain `URLEncoder` link would round-trip in production but not in the controller test.
+
+### 7. A fourth template had the same unencoded-identifier defect
+
+The review listed `executionsTable.jte`, `historyTable.jte` and `recurring.jte`. Grepping the
+JTE tree as instructed also turned up `fragments/recentFailures.jte:12`, which builds the same
+`?task=…&id=…` link from a history entry. It is fixed and tested alongside the other three.
+
+### 8. Auto-configuration ordering hint is belt-and-braces
+
+Both starters now declare `afterName = {DbSchedulerAutoConfiguration, DataSourceAutoConfiguration}`.
+The `DataSource` back-off test passes without the second entry — Spring already evaluates
+`DataSourceAutoConfiguration` first here — but `@ConditionalOnBean` is only reliable when the
+auto-configuration that *defines* the bean is ordered earlier, so the guarantee is made
+explicit rather than left to incidental sort order.
+
+### 9. `ExecutionRepository.nextExecutionTime` and `HistoryRepository.latestForTask` are retained
+
+The batched `nextExecutionTimes()` / `latestPerTask()` queries replaced them on the recurring
+page, so neither has a production caller any more. They are kept because they remain part of
+the repositories' public API and the review requires the dialect contract suite to exercise
+every public query method; both are covered there on all dialects.
+
+### Local build note (environment, not a repo change)
+
+Gradle 8.14.3 cannot run on the JDK 25 that is currently first on this machine's `PATH`
+(`./gradlew` fails with a bare `25.0.3`). The build was run with
+`JAVA_HOME=~/.sdkman/candidates/java/17.0.19-tem`, which matches the project's Java 17
+toolchain. No build file was changed.
+
 ## Known gaps
 
 ### SQL Server contract test is not verified on this machine (Apple Silicon / arm64)
