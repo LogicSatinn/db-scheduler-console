@@ -4,6 +4,7 @@ plugins {
 }
 
 mavenPublishing {
+    coordinates(artifactId = "db-scheduler-console-spring-boot-3-starter")
     pom {
         name.set("db-scheduler Console Spring Boot 3 Starter")
         description.set(

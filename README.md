@@ -10,17 +10,25 @@ React, no Node build, no CDN calls. Add one starter dependency and open
 (task data, per-instance history, stack traces) · recurring task definitions ·
 searchable execution history.
 
+> **Status:** pre-release — the current version is the `0.1.0-M1` milestone. It is fully
+> functional, but details may still change before `0.1.0`.
+
 ## Quickstart
 
 Spring Boot 3:
 ```kotlin
-implementation("io.github.logicsatinn:console-spring-boot-3-starter:0.1.0-SNAPSHOT")
+implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-3-starter:0.1.0-M1")
 ```
 
 Spring Boot 4:
 ```kotlin
-implementation("io.github.logicsatinn:console-spring-boot-4-starter:0.1.0-SNAPSHOT")
+implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-4-starter:0.1.0-M1")
 ```
+
+The starter brings in db-scheduler's own Spring Boot starter transitively — don't add a
+separate db-scheduler dependency. You need: Java 17+, a servlet web app
+(`spring-boot-starter-web`), a configured `DataSource`, and db-scheduler's
+[`scheduled_tasks` table](https://github.com/kagkarlsson/db-scheduler#getting-started).
 
 Start your app and open `http://localhost:8080/db-scheduler-console`.
 

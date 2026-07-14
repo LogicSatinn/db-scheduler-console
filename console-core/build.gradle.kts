@@ -5,6 +5,7 @@ plugins {
 }
 
 mavenPublishing {
+    coordinates(artifactId = "db-scheduler-console-core")
     pom {
         name.set("db-scheduler Console Core")
         description.set(
