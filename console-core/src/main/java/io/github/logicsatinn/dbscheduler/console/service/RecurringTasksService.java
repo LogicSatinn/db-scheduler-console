@@ -9,6 +9,7 @@ import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 public class RecurringTasksService {
 
@@ -27,14 +28,17 @@ public class RecurringTasksService {
     public record Row(String taskName, String type, Instant nextExecution, HistoryEntry lastRun) {}
 
     public List<Row> rows() {
-        boolean withHistory = historyAvailable();
+        // Two batched queries, not two per task.
+        Map<String, Instant> nextExecutions = executions.nextExecutionTimes();
+        Map<String, HistoryEntry> lastRuns =
+                historyAvailable() ? history.latestPerTask() : Map.of();
         return knownTasks.stream()
                 .sorted(Comparator.comparing(Task::getName))
                 .map(task -> new Row(
                         task.getName(),
                         typeOf(task),
-                        executions.nextExecutionTime(task.getName()).orElse(null),
-                        withHistory ? history.latestForTask(task.getName()).orElse(null) : null))
+                        nextExecutions.get(task.getName()),
+                        lastRuns.get(task.getName())))
                 .toList();
     }
 

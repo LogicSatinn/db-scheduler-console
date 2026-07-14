@@ -12,8 +12,11 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -117,6 +120,27 @@ public class HistoryRepository {
         List<Object> params = new ArrayList<>(List.of(taskName));
         params.addAll(Arrays.asList(dialect.paginationParams(0, 1)));
         return jdbc.query(sql, ROW_MAPPER, params.toArray()).stream().findFirst();
+    }
+
+    /**
+     * Newest entry per task, batched — the recurring page needs one per task. Joining on
+     * MAX(id) is portable across all six dialects; window functions and LIMIT-in-subquery are
+     * not. id is monotonic per insert, so it is also the tiebreak the per-task query uses.
+     */
+    public Map<String, HistoryEntry> latestPerTask() {
+        String sql = "SELECT " + qualified(COLUMNS) + " FROM " + TABLE + " h"
+                + " JOIN (SELECT task_name, MAX(id) AS max_id FROM " + TABLE
+                + " GROUP BY task_name) latest ON h.id = latest.max_id";
+        Map<String, HistoryEntry> byTask = new HashMap<>();
+        for (HistoryEntry e : jdbc.query(sql, ROW_MAPPER)) {
+            byTask.put(e.taskName(), e);
+        }
+        return byTask;
+    }
+
+    private static String qualified(String columns) {
+        return Arrays.stream(columns.split(", ")).map(c -> "h." + c)
+                .collect(Collectors.joining(", "));
     }
 
     public int purgeOlderThan(Instant cutoff) {

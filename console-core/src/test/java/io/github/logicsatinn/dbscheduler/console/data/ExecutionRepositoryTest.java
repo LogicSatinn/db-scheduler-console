@@ -2,6 +2,7 @@ package io.github.logicsatinn.dbscheduler.console.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -99,6 +100,19 @@ class ExecutionRepositoryTest {
         var desc = repo.page(new ExecutionFilter(null, null, null, null, null,
                 0, 10, SortColumn.EXECUTION_TIME, true), NOW);
         assertThat(desc.items().get(0).instanceId()).isEqualTo("i-24");
+    }
+
+    @Test
+    void nextExecutionTimesReturnsTheEarliestUnpickedRunPerTask() {
+        insert("task-a", "1", NOW.plus(2, ChronoUnit.HOURS), false, null, 0);
+        insert("task-a", "2", NOW.plus(1, ChronoUnit.HOURS), false, null, 0);
+        insert("task-b", "3", NOW.plus(30, ChronoUnit.MINUTES), false, null, 0);
+        insert("task-c", "4", NOW.plus(5, ChronoUnit.MINUTES), true, "node-1", 0); // picked
+
+        assertThat(repo.nextExecutionTimes())
+                .containsOnly(
+                        entry("task-a", NOW.plus(1, ChronoUnit.HOURS)),
+                        entry("task-b", NOW.plus(30, ChronoUnit.MINUTES)));
     }
 
     @Test

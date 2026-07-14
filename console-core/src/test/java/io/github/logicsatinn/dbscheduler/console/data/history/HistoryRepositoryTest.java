@@ -100,6 +100,33 @@ class HistoryRepositoryTest {
     }
 
     @Test
+    void latestPerTaskReturnsTheNewestEntryForEveryTaskInOneQuery() {
+        repo.insert(entry("email", "1", HistoryEntry.Outcome.FAILED, NOW.minusSeconds(90), "older"));
+        repo.insert(entry("email", "2", HistoryEntry.Outcome.SUCCEEDED, NOW.minusSeconds(30), null));
+        repo.insert(entry("report", "3", HistoryEntry.Outcome.FAILED, NOW.minusSeconds(10), "newest"));
+
+        var latest = repo.latestPerTask();
+
+        assertThat(latest).containsOnlyKeys("email", "report");
+        assertThat(latest.get("email").instanceId()).isEqualTo("2");
+        assertThat(latest.get("email").outcome()).isEqualTo(HistoryEntry.Outcome.SUCCEEDED);
+        assertThat(latest.get("report").exceptionMessage()).isEqualTo("newest");
+    }
+
+    @Test
+    void latestPerTaskTiebreaksOnIdWhenTimestampsMatch() {
+        repo.insert(entry("email", "first", HistoryEntry.Outcome.FAILED, NOW, "first"));
+        repo.insert(entry("email", "second", HistoryEntry.Outcome.SUCCEEDED, NOW, null));
+
+        assertThat(repo.latestPerTask().get("email").instanceId()).isEqualTo("second");
+    }
+
+    @Test
+    void latestPerTaskIsEmptyWhenThereIsNoHistory() {
+        assertThat(repo.latestPerTask()).isEmpty();
+    }
+
+    @Test
     void createTableScriptReturnsDialectDdl() {
         assertThat(repo.createTableScript()).contains("create table dsc_execution_history");
     }

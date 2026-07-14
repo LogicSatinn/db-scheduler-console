@@ -6,8 +6,10 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
@@ -91,6 +93,20 @@ public class ExecutionRepository {
                         + " WHERE task_name = ? AND picked = ?",
                 (rs, i) -> rs.getTimestamp("next_time"), taskName, false);
         return result.stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
+    }
+
+    /** Earliest unpicked execution per task, batched — the recurring page needs one per task. */
+    public Map<String, Instant> nextExecutionTimes() {
+        Map<String, Instant> byTask = new HashMap<>();
+        jdbc.query("SELECT task_name, MIN(execution_time) AS next_time FROM " + table
+                        + " WHERE picked = ? GROUP BY task_name",
+                rs -> {
+                    Timestamp next = rs.getTimestamp("next_time");
+                    if (next != null) {
+                        byTask.put(rs.getString("task_name"), next.toInstant());
+                    }
+                }, false);
+        return byTask;
     }
 
     public List<String> distinctTaskNames() {

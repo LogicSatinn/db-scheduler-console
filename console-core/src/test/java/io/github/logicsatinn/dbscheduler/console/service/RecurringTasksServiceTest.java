@@ -9,9 +9,15 @@ import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +50,53 @@ class RecurringTasksServiceTest {
         history = new HistoryRepository(ds, Dialect.H2);
         service = new RecurringTasksService(KNOWN,
                 new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2), history);
+    }
+
+    /** Counts JDBC statements so an N+1 cannot creep back in as tasks are added. */
+    static DataSource counting(DataSource delegate, AtomicInteger statements) {
+        return (DataSource) Proxy.newProxyInstance(
+                DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+                    Object result = invoke(delegate, method, args);
+                    if (!(result instanceof Connection connection)) {
+                        return result;
+                    }
+                    return Proxy.newProxyInstance(
+                            Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+                            (c, m, a) -> {
+                                if (m.getName().startsWith("prepareStatement")
+                                        || m.getName().equals("createStatement")) {
+                                    statements.incrementAndGet();
+                                }
+                                return invoke(connection, m, a);
+                            });
+                });
+    }
+
+    static Object invoke(Object target, Method method, Object[] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
+    }
+
+    @Test
+    void rowsQueryCountDoesNotGrowWithTheNumberOfTasks() {
+        List<Task<?>> many = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            many.add(Tasks.recurring("task-" + i, FixedDelay.ofHours(1)).execute((in, c) -> {}));
+        }
+        var statements = new AtomicInteger();
+        DataSource counted = counting(ds, statements);
+        var service = new RecurringTasksService(many,
+                new ExecutionRepository(counted, "scheduled_tasks", Dialect.H2),
+                new HistoryRepository(counted, Dialect.H2));
+
+        assertThat(service.rows()).hasSize(10);
+
+        // tableExists + one batched query per repository — never one query per task.
+        assertThat(statements.get()).isLessThanOrEqualTo(3);
     }
 
     @Test
