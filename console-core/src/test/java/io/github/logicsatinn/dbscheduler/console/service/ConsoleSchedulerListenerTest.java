@@ -67,4 +67,13 @@ class ConsoleSchedulerListenerTest {
                 ExecutionComplete.success(execution(), started, started.plusSeconds(1))))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    void neverThrowsWhenRepositoryRaisesAnError() {
+        doThrow(new NoClassDefFoundError("jdbc driver")).when(repo).insert(any());
+        Instant started = Instant.now();
+        assertThatCode(() -> listener.onExecutionComplete(
+                ExecutionComplete.success(execution(), started, started.plusSeconds(1))))
+                .doesNotThrowAnyException();
+    }
 }

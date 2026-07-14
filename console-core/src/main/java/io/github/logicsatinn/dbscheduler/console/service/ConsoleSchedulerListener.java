@@ -45,8 +45,8 @@ public class ConsoleSchedulerListener extends AbstractSchedulerListener {
                     cause == null ? null : cause.getMessage(),
                     cause == null ? null : stacktraceOf(cause),
                     execution.pickedBy));
-        } catch (RuntimeException e) {
-            LOG.warn("db-scheduler-console: failed to record execution history", e);
+        } catch (Throwable t) {
+            LOG.warn("db-scheduler-console: failed to record execution history", t);
         }
     }
 
