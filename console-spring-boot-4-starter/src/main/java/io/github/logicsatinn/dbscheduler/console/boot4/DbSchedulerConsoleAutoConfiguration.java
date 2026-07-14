@@ -122,8 +122,9 @@ public class DbSchedulerConsoleAutoConfiguration {
     @ConditionalOnProperty(prefix = "db-scheduler-console.history", name = "enabled",
             havingValue = "true", matchIfMissing = true)
     RecurringTask<Void> dbSchedulerConsoleHistoryPurgeTask(HistoryRepository history,
-            ConsoleProperties props) {
-        return HistoryPurgeTask.create(history, props.getHistory().getRetention(), CLOCK);
+            ConsoleAvailability availability, ConsoleProperties props) {
+        return HistoryPurgeTask.create(
+                history, availability, props.getHistory().getRetention(), CLOCK);
     }
 
     @Bean

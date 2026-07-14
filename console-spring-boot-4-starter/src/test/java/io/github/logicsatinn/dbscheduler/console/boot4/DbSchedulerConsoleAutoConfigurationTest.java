@@ -1,6 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.boot4;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 
 import com.github.kagkarlsson.scheduler.Scheduler;
@@ -85,6 +86,17 @@ class DbSchedulerConsoleAutoConfigurationTest {
                         "spring.datasource.url=jdbc:h2:mem:noscheduler;DB_CLOSE_DELAY=-1",
                         "spring.datasource.driver-class-name=org.h2.Driver")
                 .run(ctx -> assertThat(ctx).doesNotHaveBean(OverviewController.class));
+    }
+
+    @Test
+    void historyPurgeTaskIsHarmlessWithoutTheHistoryMigration() {
+        runner.run(ctx -> {
+            @SuppressWarnings("unchecked")
+            RecurringTask<Void> purge = ctx.getBean(
+                    "dbSchedulerConsoleHistoryPurgeTask", RecurringTask.class);
+            assertThatCode(() -> purge.execute(purge.instance(RecurringTask.INSTANCE), null))
+                    .doesNotThrowAnyException();
+        });
     }
 
     @Test
