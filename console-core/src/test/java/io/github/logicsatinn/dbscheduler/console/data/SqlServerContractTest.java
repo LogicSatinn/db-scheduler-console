@@ -20,8 +20,7 @@ class SqlServerContractTest extends RepositoryContractTest {
     @BeforeAll
     static void schema() {
         ds = simpleDataSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
-        applyScripts(ds, "db-scheduler-schema/sqlserver.sql",
-                "db-scheduler-console/migrations/sqlserver.sql");
+        prepareSchema(ds, Dialect.SQLSERVER, "db-scheduler-schema/sqlserver.sql");
     }
 
     @Override protected DataSource dataSource() { return ds; }

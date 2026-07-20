@@ -18,6 +18,7 @@
                 <tr><th>Last success</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastSuccess())}</td></tr>
                 <tr><th>Last failure</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastFailure())}</td></tr>
                 <tr><th>Version</th><td class="num">${row.version()}</td></tr>
+                <tr><th>Priority</th><td class="num">${row.priority()}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -25,19 +26,35 @@
             <h2>Task data</h2>
             <pre class="data">${dataPreview}</pre>
         </div>
+        @if(row.parked() && row.exceptionClass() != null)
+            <div class="card">
+                <h2>Terminal failure</h2>
+                <p><strong>${row.exceptionClass()}</strong>: ${row.exceptionMessage()}</p>
+                @if(row.stacktrace() != null)
+                    <pre class="data">${row.stacktrace()}</pre>
+                @endif
+            </div>
+        @endif
         @if(!ctx.readOnly())
             <div class="card">
                 <h2>Actions</h2>
                 <form style="display:inline" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
                     <input type="hidden" name="task" value="${row.taskName()}">
                     <input type="hidden" name="id" value="${row.instanceId()}">
-                    <button type="submit">Run now</button>
+                    <button type="submit">${row.parked() ? "Requeue" : "Run now"}</button>
                 </form>
-                <form style="display:inline" hx-post="${ctx.basePath()}/actions/reschedule" hx-target="#flash" hx-swap="innerHTML">
+                @if(!row.parked())
+                    <form style="display:inline" hx-post="${ctx.basePath()}/actions/reschedule" hx-target="#flash" hx-swap="innerHTML">
+                        <input type="hidden" name="task" value="${row.taskName()}">
+                        <input type="hidden" name="id" value="${row.instanceId()}">
+                        <input type="datetime-local" name="when" required>
+                        <button type="submit">Reschedule</button>
+                    </form>
+                @endif
+                <form style="display:inline" hx-post="${ctx.basePath()}/actions/delete" hx-confirm="Delete this execution?" hx-target="#flash" hx-swap="innerHTML">
                     <input type="hidden" name="task" value="${row.taskName()}">
                     <input type="hidden" name="id" value="${row.instanceId()}">
-                    <input type="datetime-local" name="when" required>
-                    <button type="submit">Reschedule</button>
+                    <button type="submit" class="danger">Delete</button>
                 </form>
             </div>
         @endif

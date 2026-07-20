@@ -19,8 +19,7 @@ class PostgresContractTest extends RepositoryContractTest {
     @BeforeAll
     static void schema() {
         ds = simpleDataSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
-        applyScripts(ds, "db-scheduler-schema/postgresql.sql",
-                "db-scheduler-console/migrations/postgresql.sql");
+        prepareSchema(ds, Dialect.POSTGRES, "db-scheduler-schema/postgresql.sql");
     }
 
     @Override protected DataSource dataSource() { return ds; }

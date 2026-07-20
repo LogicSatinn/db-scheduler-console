@@ -32,6 +32,7 @@ class DbSchedulerConsoleAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(
                     DataSourceAutoConfiguration.class,
                     DbSchedulerAutoConfiguration.class,
+                    DbSchedulerConsoleInfrastructureAutoConfiguration.class,
                     DbSchedulerConsoleAutoConfiguration.class))
             .withPropertyValues(
                     "spring.datasource.url=jdbc:h2:mem:autoconf;DB_CLOSE_DELAY=-1",
@@ -81,6 +82,7 @@ class DbSchedulerConsoleAutoConfigurationTest {
         new WebApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
                         DataSourceAutoConfiguration.class,
+                        DbSchedulerConsoleInfrastructureAutoConfiguration.class,
                         DbSchedulerConsoleAutoConfiguration.class))
                 .withPropertyValues(
                         "spring.datasource.url=jdbc:h2:mem:noscheduler;DB_CLOSE_DELAY=-1",
@@ -117,6 +119,7 @@ class DbSchedulerConsoleAutoConfigurationTest {
         new WebApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
                         DataSourceAutoConfiguration.class,
+                        DbSchedulerConsoleInfrastructureAutoConfiguration.class,
                         DbSchedulerConsoleAutoConfiguration.class))
                 .withUserConfiguration(OwnSchedulerConfig.class)
                 .withPropertyValues(

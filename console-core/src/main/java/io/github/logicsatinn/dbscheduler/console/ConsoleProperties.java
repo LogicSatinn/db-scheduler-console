@@ -26,10 +26,13 @@ public class ConsoleProperties {
 
     public static class History {
         private boolean enabled = true;
+        private boolean storeTaskData = true;
         private Duration retention = Duration.ofDays(14);
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public boolean isStoreTaskData() { return storeTaskData; }
+        public void setStoreTaskData(boolean storeTaskData) { this.storeTaskData = storeTaskData; }
         public Duration getRetention() { return retention; }
         public void setRetention(Duration retention) { this.retention = retention; }
     }

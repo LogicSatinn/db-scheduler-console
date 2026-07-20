@@ -19,8 +19,7 @@ class MariadbContractTest extends RepositoryContractTest {
     @BeforeAll
     static void schema() {
         ds = simpleDataSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
-        applyScripts(ds, "db-scheduler-schema/mariadb.sql",
-                "db-scheduler-console/migrations/mariadb.sql");
+        prepareSchema(ds, Dialect.MARIADB, "db-scheduler-schema/mariadb.sql");
     }
 
     @Override protected DataSource dataSource() { return ds; }

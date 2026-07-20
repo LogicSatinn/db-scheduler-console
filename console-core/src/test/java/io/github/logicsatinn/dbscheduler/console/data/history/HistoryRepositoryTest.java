@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class HistoryRepositoryTest {
 
@@ -38,9 +40,12 @@ class HistoryRepositoryTest {
     @Test
     void tableExistsDetection() {
         assertThat(repo.tableExists()).isTrue();
+        assertThat(repo.schema()).isEqualTo(HistoryRepository.Schema.CURRENT);
         var emptyDs = new EmbeddedDatabaseBuilder()
                 .setType(EmbeddedDatabaseType.H2).generateUniqueName(true).build();
         assertThat(new HistoryRepository(emptyDs, Dialect.H2).tableExists()).isFalse();
+        assertThat(new HistoryRepository(emptyDs, Dialect.H2).schema())
+                .isEqualTo(HistoryRepository.Schema.MISSING);
     }
 
     @Test
@@ -128,6 +133,59 @@ class HistoryRepositoryTest {
 
     @Test
     void createTableScriptReturnsDialectDdl() {
-        assertThat(repo.createTableScript()).contains("create table dsc_execution_history");
+        assertThat(repo.createTableScript())
+                .contains("create table dsc_execution_history")
+                .contains("create table dsc_failed_execution")
+                .contains("task_data_type");
+    }
+
+    @Test
+    void payloadRoundTripsAndRetentionUsesFinishedTime() {
+        byte[] payload = new byte[] {0, 1, 2, 3};
+        repo.insert(new HistoryEntry(0, "email", "payload", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minus(30, ChronoUnit.DAYS), NOW, 1000,
+                null, null, null, "node", payload, "example.PayloadV1"));
+        repo.insert(new HistoryEntry(0, "email", "old", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minus(30, ChronoUnit.DAYS), NOW.minus(29, ChronoUnit.DAYS), 1000,
+                null, null, null, "node", null, null));
+
+        HistoryEntry saved = repo.forInstance("email", "payload", 1).get(0);
+        assertThat(saved.taskData()).containsExactly(payload);
+        assertThat(saved.taskDataType()).isEqualTo("example.PayloadV1");
+        assertThat(repo.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS))).isEqualTo(1);
+        assertThat(repo.forInstance("email", "payload", 1)).hasSize(1);
+    }
+
+    @Test
+    void legacySchemaWritesMetadataAndCanBeUpgraded() {
+        var legacyDs = new EmbeddedDatabaseBuilder()
+                .setType(EmbeddedDatabaseType.H2).generateUniqueName(true).build();
+        new org.springframework.jdbc.core.JdbcTemplate(legacyDs).execute("""
+                create table dsc_execution_history (
+                  id bigint generated always as identity primary key,
+                  task_name varchar(250) not null,
+                  task_instance varchar(250) not null,
+                  outcome varchar(16) not null,
+                  started_at timestamp with time zone not null,
+                  finished_at timestamp with time zone not null,
+                  duration_ms bigint not null,
+                  exception_class varchar(512),
+                  exception_message varchar(2000),
+                  stacktrace clob,
+                  picked_by varchar(255)
+                )""");
+        var legacy = new HistoryRepository(legacyDs, Dialect.H2);
+        assertThat(legacy.schema()).isEqualTo(HistoryRepository.Schema.LEGACY);
+        legacy.insert(new HistoryEntry(0, "email", "legacy", HistoryEntry.Outcome.SUCCEEDED,
+                NOW, NOW.plusSeconds(1), 1000, null, null, null, "node",
+                new byte[] {1, 2}, "PayloadV1"));
+        assertThat(legacy.forInstance("email", "legacy", 1).get(0).taskData()).isNull();
+        assertThat(legacy.upgradeTableScript()).contains("alter table dsc_execution_history");
+
+        new ResourceDatabasePopulator(new ByteArrayResource(
+                legacy.upgradeTableScript().getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .execute(legacyDs);
+        legacy.refreshSchema();
+        assertThat(legacy.schema()).isEqualTo(HistoryRepository.Schema.CURRENT);
     }
 }

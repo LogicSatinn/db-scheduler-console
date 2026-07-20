@@ -7,9 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.logicsatinn.dbscheduler.console.ConsoleProperties;
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
+import io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
+import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -46,11 +48,12 @@ class ExecutionsControllerTest {
                 .build();
         jdbc = new JdbcTemplate(ds);
         var repo = new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
+        var failed = new FailedExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
         history = new HistoryRepository(ds, Dialect.H2);
         var controller = new ExecutionsController(
                 new PageCtxFactory(new ConsoleProperties()), new TemplateRenderer(),
-                repo, history, new TaskDataRenderer(null, true),
-                new StatsService(repo, history, Clock.fixed(NOW, ZoneOffset.UTC)),
+                new ExecutionsService(repo, failed), history, new TaskDataRenderer(null, true),
+                new StatsService(repo, failed, history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")

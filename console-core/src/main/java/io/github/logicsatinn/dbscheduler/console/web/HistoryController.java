@@ -4,6 +4,7 @@ import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
+import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -26,13 +27,20 @@ public class HistoryController {
     private final TemplateRenderer templates;
     private final HistoryRepository history;
     private final Dialect dialect;
+    private final TaskDataRenderer taskData;
 
     public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
-            HistoryRepository history, Dialect dialect) {
+            HistoryRepository history, Dialect dialect, TaskDataRenderer taskData) {
         this.ctxFactory = ctxFactory;
         this.templates = templates;
         this.history = history;
         this.dialect = dialect;
+        this.taskData = taskData;
+    }
+
+    public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
+            HistoryRepository history, Dialect dialect) {
+        this(ctxFactory, templates, history, dialect, new TaskDataRenderer(null, true));
     }
 
     @GetMapping("/history")
@@ -46,10 +54,12 @@ public class HistoryController {
             @RequestParam(defaultValue = "25") int size,
             HttpServletRequest request) {
         var ctx = ctxFactory.page("history", request);
-        if (!history.tableExists()) {
+        HistoryRepository.Schema schema = history.schema();
+        if (schema == HistoryRepository.Schema.MISSING) {
             return templates.page("pages/historySetup.jte", Map.of(
                     "ctx", ctx,
                     "dialectName", dialect.name(),
+                    "legacy", false,
                     "script", history.createTableScript()));
         }
         HistoryEntry.Outcome parsedOutcome = null;
@@ -72,6 +82,10 @@ public class HistoryController {
         model.put("fromParam", from == null ? "" : from);
         model.put("toParam", to == null ? "" : to);
         model.put("page", history.page(filter));
+        model.put("taskData", taskData);
+        model.put("legacy", schema == HistoryRepository.Schema.LEGACY);
+        model.put("upgradeScript", schema == HistoryRepository.Schema.LEGACY
+                ? history.upgradeTableScript() : "");
         model.put("queryBase", queryBase(task, outcome, q, from, to, size));
         return templates.page("pages/history.jte", model);
     }

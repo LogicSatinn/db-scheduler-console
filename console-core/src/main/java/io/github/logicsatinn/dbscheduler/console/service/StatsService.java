@@ -1,6 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.service;
 
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
+import io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import java.time.Clock;
@@ -14,17 +15,24 @@ public class StatsService {
     private static final int WINDOW_CAP = 200_000;
 
     private final ExecutionRepository executions;
+    private final FailedExecutionRepository failedExecutions;
     private final HistoryRepository history;
     private final Clock clock;
     private volatile boolean historyTableSeen;
 
     public StatsService(ExecutionRepository executions, HistoryRepository history, Clock clock) {
+        this(executions, null, history, clock);
+    }
+
+    public StatsService(ExecutionRepository executions, FailedExecutionRepository failedExecutions,
+            HistoryRepository history, Clock clock) {
         this.executions = executions;
+        this.failedExecutions = failedExecutions;
         this.history = history;
         this.clock = clock;
     }
 
-    public record Tiles(long scheduled, long due, long running, long failing,
+    public record Tiles(long scheduled, long due, long running, long retrying, long failed,
                         long succeeded24h, long failed24h) {}
 
     public record HourBucket(Instant hourStart, long succeeded, long failed) {}
@@ -42,7 +50,8 @@ public class StatsService {
         var outcomes = historyAvailable()
                 ? history.countsSince(now.minus(24, ChronoUnit.HOURS))
                 : new HistoryRepository.OutcomeCounts(0, 0);
-        return new Tiles(live.scheduled(), live.due(), live.running(), live.failing(),
+        long failed = failedExecutions == null ? 0 : failedExecutions.count();
+        return new Tiles(live.scheduled(), live.due(), live.running(), live.retrying(), failed,
                 outcomes.succeeded(), outcomes.failed());
     }
 

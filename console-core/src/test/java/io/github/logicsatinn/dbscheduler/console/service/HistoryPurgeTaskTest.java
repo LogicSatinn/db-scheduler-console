@@ -22,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
@@ -103,9 +104,15 @@ class HistoryPurgeTaskTest {
 
     @Test
     void purgesEntriesOlderThanRetention() {
-        var history = new HistoryRepository(withHistoryTable(), Dialect.H2);
+        var dataSource = withHistoryTable();
+        var history = new HistoryRepository(dataSource, Dialect.H2);
         insert(history, "old", NOW.minus(30, ChronoUnit.DAYS));
         insert(history, "recent", NOW.minus(1, ChronoUnit.DAYS));
+        new JdbcTemplate(dataSource).update(
+                "insert into dsc_failed_execution"
+                        + " (task_name, task_instance, priority, failure_count, failed_at)"
+                        + " values ('email', 'parked', 0, 4, ?)",
+                java.sql.Timestamp.from(NOW.minus(30, ChronoUnit.DAYS)));
         var task = HistoryPurgeTask.create(
                 history, new ConsoleAvailability(Dialect.H2), RETENTION, CLOCK);
 
@@ -113,5 +120,7 @@ class HistoryPurgeTaskTest {
 
         assertThat(history.forInstance("email", "old", 10)).isEmpty();
         assertThat(history.forInstance("email", "recent", 10)).hasSize(1);
+        assertThat(new JdbcTemplate(dataSource).queryForObject(
+                "select count(*) from dsc_failed_execution", Long.class)).isEqualTo(1);
     }
 }

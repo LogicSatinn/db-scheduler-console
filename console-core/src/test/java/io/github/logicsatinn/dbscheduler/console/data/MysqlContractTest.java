@@ -19,8 +19,7 @@ class MysqlContractTest extends RepositoryContractTest {
     @BeforeAll
     static void schema() {
         ds = simpleDataSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
-        applyScripts(ds, "db-scheduler-schema/mysql.sql",
-                "db-scheduler-console/migrations/mysql.sql");
+        prepareSchema(ds, Dialect.MYSQL, "db-scheduler-schema/mysql.sql");
     }
 
     @Override protected DataSource dataSource() { return ds; }

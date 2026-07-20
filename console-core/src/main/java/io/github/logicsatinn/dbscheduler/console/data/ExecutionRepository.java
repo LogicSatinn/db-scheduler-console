@@ -2,8 +2,8 @@ package io.github.logicsatinn.dbscheduler.console.data;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 
 public class ExecutionRepository {
 
@@ -27,7 +26,7 @@ public class ExecutionRepository {
 
     private static final String COLUMNS =
             "task_name, task_instance, task_data, execution_time, picked, picked_by, "
-            + "last_success, last_failure, consecutive_failures, last_heartbeat, version";
+            + "last_success, last_failure, consecutive_failures, last_heartbeat, version, priority";
 
     private final JdbcTemplate jdbc;
     private final String table;
@@ -43,7 +42,7 @@ public class ExecutionRepository {
      * The table name is concatenated into every query, so it is the one identifier a
      * deployment can inject into our SQL. Fail fast at startup rather than quote per dialect.
      */
-    private static String validateTableName(String tableName) {
+    static String validateTableName(String tableName) {
         if (tableName == null || !TABLE_NAME.matcher(tableName).matches()) {
             throw new IllegalArgumentException(
                     "db-scheduler.table-name must be a plain SQL identifier, optionally"
@@ -53,7 +52,11 @@ public class ExecutionRepository {
         return tableName;
     }
 
-    public record LiveCounts(long scheduled, long due, long running, long failing) {}
+    public record LiveCounts(long scheduled, long due, long running, long retrying) {
+        /** @deprecated use {@link #retrying()} */
+        @Deprecated
+        public long failing() { return retrying; }
+    }
 
     public String tableName() {
         return table;
@@ -75,7 +78,7 @@ public class ExecutionRepository {
         pageParams.addAll(Arrays.asList(
                 dialect.paginationParams(f.page() * f.pageSize(), f.pageSize())));
 
-        List<ExecutionRow> rows = jdbc.query(sql, ROW_MAPPER, pageParams.toArray());
+        List<ExecutionRow> rows = jdbc.query(sql, this::mapRow, pageParams.toArray());
         return new Page<>(rows, f.page(), f.pageSize(), total == null ? 0 : total);
     }
 
@@ -83,16 +86,16 @@ public class ExecutionRepository {
         List<ExecutionRow> rows = jdbc.query(
                 "SELECT " + COLUMNS + " FROM " + table
                         + " WHERE task_name = ? AND task_instance = ?",
-                ROW_MAPPER, taskName, instanceId);
+                this::mapRow, taskName, instanceId);
         return rows.stream().findFirst();
     }
 
     public java.util.Optional<Instant> nextExecutionTime(String taskName) {
-        List<Timestamp> result = jdbc.query(
+        List<Instant> result = jdbc.query(
                 "SELECT MIN(execution_time) AS next_time FROM " + table
                         + " WHERE task_name = ? AND picked = ?",
-                (rs, i) -> rs.getTimestamp("next_time"), taskName, false);
-        return result.stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
+                (rs, i) -> instant(rs, "next_time"), taskName, false);
+        return result.stream().filter(java.util.Objects::nonNull).findFirst();
     }
 
     /** Earliest unpicked execution per task, batched — the recurring page needs one per task. */
@@ -101,9 +104,9 @@ public class ExecutionRepository {
         jdbc.query("SELECT task_name, MIN(execution_time) AS next_time FROM " + table
                         + " WHERE picked = ? GROUP BY task_name",
                 rs -> {
-                    Timestamp next = rs.getTimestamp("next_time");
+                    Instant next = instant(rs, "next_time");
                     if (next != null) {
-                        byTask.put(rs.getString("task_name"), next.toInstant());
+                        byTask.put(rs.getString("task_name"), next);
                     }
                 }, false);
         return byTask;
@@ -119,7 +122,7 @@ public class ExecutionRepository {
                 countState(ExecutionState.SCHEDULED, now),
                 countState(ExecutionState.DUE, now),
                 countState(ExecutionState.RUNNING, now),
-                countState(ExecutionState.FAILING, now));
+                countState(ExecutionState.RETRYING, now));
     }
 
     private long countState(ExecutionState state, Instant now) {
@@ -145,11 +148,11 @@ public class ExecutionRepository {
         }
         if (f.from() != null) {
             where.append(" AND execution_time >= ?");
-            params.add(Timestamp.from(f.from()));
+            params.add(dialect.jdbcTimestamp(f.from()));
         }
         if (f.to() != null) {
             where.append(" AND execution_time <= ?");
-            params.add(Timestamp.from(f.to()));
+            params.add(dialect.jdbcTimestamp(f.to()));
         }
     }
 
@@ -157,20 +160,23 @@ public class ExecutionRepository {
             StringBuilder where, List<Object> params) {
         switch (state) {
             case RUNNING -> where.append(" AND picked = ?").append(add(params, true));
-            case FAILING -> {
+            case RETRYING -> {
                 where.append(" AND picked = ?").append(add(params, false));
                 where.append(" AND COALESCE(consecutive_failures, 0) > 0");
             }
             case DUE -> {
                 where.append(" AND picked = ?").append(add(params, false));
                 where.append(" AND COALESCE(consecutive_failures, 0) = 0");
-                where.append(" AND execution_time <= ?").append(add(params, Timestamp.from(now)));
+                where.append(" AND execution_time <= ?")
+                        .append(add(params, dialect.jdbcTimestamp(now)));
             }
             case SCHEDULED -> {
                 where.append(" AND picked = ?").append(add(params, false));
                 where.append(" AND COALESCE(consecutive_failures, 0) = 0");
-                where.append(" AND execution_time > ?").append(add(params, Timestamp.from(now)));
+                where.append(" AND execution_time > ?")
+                        .append(add(params, dialect.jdbcTimestamp(now)));
             }
+            case FAILED -> where.append(" AND 1=0");
         }
     }
 
@@ -180,21 +186,33 @@ public class ExecutionRepository {
         return "";
     }
 
-    private static final RowMapper<ExecutionRow> ROW_MAPPER = (rs, rowNum) -> new ExecutionRow(
-            rs.getString("task_name"),
-            rs.getString("task_instance"),
-            rs.getBytes("task_data"),
-            instant(rs, "execution_time"),
-            rs.getBoolean("picked"),
-            rs.getString("picked_by"),
-            instant(rs, "last_success"),
-            instant(rs, "last_failure"),
-            rs.getInt("consecutive_failures"),
-            instant(rs, "last_heartbeat"),
-            rs.getLong("version"));
+    private ExecutionRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+        return new ExecutionRow(
+                rs.getString("task_name"),
+                rs.getString("task_instance"),
+                rs.getBytes("task_data"),
+                instant(rs, "execution_time"),
+                rs.getBoolean("picked"),
+                rs.getString("picked_by"),
+                instant(rs, "last_success"),
+                instant(rs, "last_failure"),
+                rs.getInt("consecutive_failures"),
+                instant(rs, "last_heartbeat"),
+                rs.getLong("version"),
+                rs.getInt("priority"),
+                false,
+                null,
+                null,
+                null,
+                null);
+    }
 
-    private static Instant instant(ResultSet rs, String col) throws SQLException {
-        Timestamp t = rs.getTimestamp(col);
+    private Instant instant(ResultSet rs, String col) throws SQLException {
+        if (dialect == Dialect.SQLSERVER) {
+            OffsetDateTime value = rs.getObject(col, OffsetDateTime.class);
+            return value == null ? null : value.toInstant();
+        }
+        java.sql.Timestamp t = rs.getTimestamp(col);
         return t == null ? null : t.toInstant();
     }
 }

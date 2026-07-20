@@ -2,6 +2,10 @@ package io.github.logicsatinn.dbscheduler.console.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -39,6 +43,15 @@ class DialectTest {
         assertThat(Dialect.POSTGRES.paginationParams(40, 20)).containsExactly(40, 20);
         assertThat(Dialect.ORACLE.paginationClause())
                 .isEqualTo(" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+    }
+
+    @Test
+    void bindsSqlServerInstantsWithAnExplicitUtcOffset() {
+        Instant instant = Instant.parse("2026-07-17T12:34:56Z");
+
+        assertThat(Dialect.SQLSERVER.jdbcTimestamp(instant))
+                .isEqualTo(OffsetDateTime.ofInstant(instant, ZoneOffset.UTC));
+        assertThat(Dialect.POSTGRES.jdbcTimestamp(instant)).isEqualTo(Timestamp.from(instant));
     }
 
     @Test

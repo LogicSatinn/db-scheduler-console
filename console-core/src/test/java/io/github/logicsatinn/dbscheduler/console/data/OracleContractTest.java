@@ -19,8 +19,7 @@ class OracleContractTest extends RepositoryContractTest {
     @BeforeAll
     static void schema() {
         ds = simpleDataSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
-        applyScripts(ds, "db-scheduler-schema/oracle.sql",
-                "db-scheduler-console/migrations/oracle.sql");
+        prepareSchema(ds, Dialect.ORACLE, "db-scheduler-schema/oracle.sql");
     }
 
     @Override protected DataSource dataSource() { return ds; }

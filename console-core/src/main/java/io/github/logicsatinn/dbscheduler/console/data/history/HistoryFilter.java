@@ -9,4 +9,9 @@ public record HistoryFilter(
         Instant from,
         Instant to,
         int page,
-        int pageSize) {}
+        int pageSize) {
+
+    public static HistoryFilter none(int page, int pageSize) {
+        return new HistoryFilter(null, null, null, null, null, page, pageSize);
+    }
+}

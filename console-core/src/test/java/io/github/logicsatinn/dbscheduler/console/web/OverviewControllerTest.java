@@ -76,7 +76,8 @@ class OverviewControllerTest {
         var doc = Jsoup.parse(body);
 
         assertThat(doc.select(".tile .label").eachText())
-                .contains("Scheduled", "Due", "Running", "Failing", "Succeeded · 24h", "Failed · 24h");
+                .contains("Scheduled", "Due", "Running", "Retrying", "Failed",
+                        "Succeeded · 24h", "Failed · 24h");
         assertThat(doc.select("svg.chart-svg")).hasSize(1);
         assertThat(doc.select("svg rect.viz-good")).hasSize(1);
         assertThat(doc.select("svg rect.viz-critical")).hasSize(1);

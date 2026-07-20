@@ -53,7 +53,7 @@ class ExecutionRepositoryTest {
                 java.util.Map.entry(ExecutionState.SCHEDULED, "1"),
                 java.util.Map.entry(ExecutionState.DUE, "2"),
                 java.util.Map.entry(ExecutionState.RUNNING, "3"),
-                java.util.Map.entry(ExecutionState.FAILING, "4"))) {
+                java.util.Map.entry(ExecutionState.RETRYING, "4"))) {
             var filter = new ExecutionFilter(expected.getKey(), null, null, null, null,
                     0, 10, SortColumn.EXECUTION_TIME, false);
             Page<ExecutionRow> page = repo.page(filter, NOW);
@@ -155,6 +155,6 @@ class ExecutionRepositoryTest {
         assertThat(counts.scheduled()).isEqualTo(1);
         assertThat(counts.due()).isEqualTo(1);
         assertThat(counts.running()).isEqualTo(1);
-        assertThat(counts.failing()).isEqualTo(1);
+        assertThat(counts.retrying()).isEqualTo(1);
     }
 }

@@ -2,18 +2,15 @@ package io.github.logicsatinn.dbscheduler.console.boot3;
 
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerCustomizer;
-import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
 import com.github.kagkarlsson.scheduler.serializer.Serializer;
 import com.github.kagkarlsson.scheduler.task.Task;
-import com.github.kagkarlsson.scheduler.task.helper.RecurringTask;
 import io.github.logicsatinn.dbscheduler.console.ConsoleAvailability;
 import io.github.logicsatinn.dbscheduler.console.ConsoleProperties;
-import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
+import io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
-import io.github.logicsatinn.dbscheduler.console.service.ConsoleSchedulerListener;
 import io.github.logicsatinn.dbscheduler.console.service.ExecutionActions;
-import io.github.logicsatinn.dbscheduler.console.service.HistoryPurgeTask;
+import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
 import io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
@@ -29,8 +26,6 @@ import io.github.logicsatinn.dbscheduler.console.web.TemplateRenderer;
 import java.time.Clock;
 import java.util.List;
 import javax.sql.DataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -53,47 +48,27 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableConfigurationProperties(ConsoleProperties.class)
 public class DbSchedulerConsoleAutoConfiguration {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DbSchedulerConsoleAutoConfiguration.class);
-
     private static final Clock CLOCK = Clock.systemUTC();
 
     @Bean
-    ConsoleAvailability dbSchedulerConsoleAvailability(DataSource dataSource) {
-        var dialect = Dialect.fromDataSource(dataSource).orElse(null);
-        if (dialect == null) {
-            LOG.error("db-scheduler-console: unsupported database — the dashboard is disabled."
-                    + " Supported: PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, H2.");
-        }
-        return new ConsoleAvailability(dialect);
-    }
-
-    @Bean
-    ExecutionRepository dbSchedulerConsoleExecutionRepository(DataSource dataSource,
-            ObjectProvider<DbSchedulerProperties> dbSchedulerProperties,
-            ConsoleAvailability availability) {
-        // Apps that build their own Scheduler have no DbSchedulerProperties bean.
-        String tableName = dbSchedulerProperties.stream()
-                .map(DbSchedulerProperties::getTableName)
-                .findFirst()
-                .orElse(ExecutionRepository.DEFAULT_TABLE_NAME);
-        return new ExecutionRepository(dataSource, tableName, availability.dialectOrFallback());
-    }
-
-    @Bean
-    HistoryRepository dbSchedulerConsoleHistoryRepository(DataSource dataSource,
-            ConsoleAvailability availability) {
-        return new HistoryRepository(dataSource, availability.dialectOrFallback());
+    ExecutionsService dbSchedulerConsoleExecutionsService(ExecutionRepository executions,
+            FailedExecutionRepository failedExecutions) {
+        return new ExecutionsService(executions, failedExecutions);
     }
 
     @Bean
     StatsService dbSchedulerConsoleStatsService(ExecutionRepository executions,
+            FailedExecutionRepository failedExecutions,
             HistoryRepository history) {
-        return new StatsService(executions, history, CLOCK);
+        return new StatsService(executions, failedExecutions, history, CLOCK);
     }
 
     @Bean
-    ExecutionActions dbSchedulerConsoleExecutionActions(Scheduler scheduler) {
-        return new ExecutionActions(scheduler, CLOCK);
+    ExecutionActions dbSchedulerConsoleExecutionActions(Scheduler scheduler,
+            FailedExecutionRepository failedExecutions, List<Task<?>> tasks,
+            ObjectProvider<DbSchedulerCustomizer> customizer) {
+        return new ExecutionActions(scheduler, CLOCK, failedExecutions,
+                effectiveSerializer(customizer), tasks);
     }
 
     @Bean
@@ -105,27 +80,10 @@ public class DbSchedulerConsoleAutoConfiguration {
     @Bean
     TaskDataRenderer dbSchedulerConsoleTaskDataRenderer(ConsoleProperties props,
             ObjectProvider<DbSchedulerCustomizer> customizer) {
-        Serializer serializer = customizer.stream()
-                .flatMap(c -> c.serializer().stream())
-                .findFirst().orElse(null);
-        return new TaskDataRenderer(serializer, props.getTaskData().isVisible());
+        return new TaskDataRenderer(effectiveSerializer(customizer),
+                props.getTaskData().isVisible());
     }
 
-    @Bean
-    @ConditionalOnProperty(prefix = "db-scheduler-console.history", name = "enabled",
-            havingValue = "true", matchIfMissing = true)
-    ConsoleSchedulerListener dbSchedulerConsoleSchedulerListener(HistoryRepository history) {
-        return new ConsoleSchedulerListener(history);
-    }
-
-    @Bean
-    @ConditionalOnProperty(prefix = "db-scheduler-console.history", name = "enabled",
-            havingValue = "true", matchIfMissing = true)
-    RecurringTask<Void> dbSchedulerConsoleHistoryPurgeTask(HistoryRepository history,
-            ConsoleAvailability availability, ConsoleProperties props) {
-        return HistoryPurgeTask.create(
-                history, availability, props.getHistory().getRetention(), CLOCK);
-    }
 
     @Bean
     TemplateRenderer dbSchedulerConsoleTemplateRenderer() {
@@ -145,7 +103,7 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     ExecutionsController dbSchedulerConsoleExecutionsController(PageCtxFactory ctx,
-            TemplateRenderer templates, ExecutionRepository executions, HistoryRepository history,
+            TemplateRenderer templates, ExecutionsService executions, HistoryRepository history,
             TaskDataRenderer taskData, StatsService stats) {
         return new ExecutionsController(ctx, templates, executions, history, taskData, stats, CLOCK);
     }
@@ -158,8 +116,10 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     HistoryController dbSchedulerConsoleHistoryController(PageCtxFactory ctx,
-            TemplateRenderer templates, HistoryRepository history, ConsoleAvailability availability) {
-        return new HistoryController(ctx, templates, history, availability.dialectOrFallback());
+            TemplateRenderer templates, HistoryRepository history, ConsoleAvailability availability,
+            TaskDataRenderer taskData) {
+        return new HistoryController(ctx, templates, history,
+                availability.dialectOrFallback(), taskData);
     }
 
     @Bean
@@ -183,5 +143,13 @@ public class DbSchedulerConsoleAutoConfiguration {
                         .addPathPatterns(props.getBasePath() + "/**");
             }
         };
+    }
+
+    private static Serializer effectiveSerializer(
+            ObjectProvider<DbSchedulerCustomizer> customizer) {
+        return customizer.stream()
+                .flatMap(candidate -> candidate.serializer().stream())
+                .findFirst()
+                .orElse(Serializer.DEFAULT_JAVA_SERIALIZER);
     }
 }

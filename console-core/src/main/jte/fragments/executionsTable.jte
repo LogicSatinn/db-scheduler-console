@@ -55,7 +55,7 @@
                         <form style="display:inline" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">
                             <input type="hidden" name="id" value="${row.instanceId()}">
-                            <button type="submit">Run now</button>
+                            <button type="submit">${row.parked() ? "Requeue" : "Run now"}</button>
                         </form>
                         <form style="display:inline" hx-post="${ctx.basePath()}/actions/delete" hx-confirm="Delete this execution?" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">

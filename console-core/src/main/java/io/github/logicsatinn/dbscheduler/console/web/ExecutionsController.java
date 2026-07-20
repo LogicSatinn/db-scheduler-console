@@ -1,12 +1,12 @@
 package io.github.logicsatinn.dbscheduler.console.web;
 
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter;
-import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionState;
 import io.github.logicsatinn.dbscheduler.console.data.SortColumn;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
+import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,14 +30,14 @@ public class ExecutionsController {
 
     private final PageCtxFactory ctxFactory;
     private final TemplateRenderer templates;
-    private final ExecutionRepository executions;
+    private final ExecutionsService executions;
     private final HistoryRepository history;
     private final TaskDataRenderer taskData;
     private final StatsService stats;
     private final Clock clock;
 
     public ExecutionsController(PageCtxFactory ctxFactory, TemplateRenderer templates,
-            ExecutionRepository executions, HistoryRepository history,
+            ExecutionsService executions, HistoryRepository history,
             TaskDataRenderer taskData, StatsService stats, Clock clock) {
         this.ctxFactory = ctxFactory;
         this.templates = templates;

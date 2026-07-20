@@ -3,12 +3,13 @@
 @param io.github.logicsatinn.dbscheduler.console.data.Page<io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry> page
 @param io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter filter
 @param String queryBase
+@param io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer taskData
 <div id="history-region">
     <table class="data">
-        <thead><tr><th>Task</th><th>Instance</th><th>Outcome</th><th>Started</th><th>Duration</th><th>Node</th><th>Error</th></tr></thead>
+        <thead><tr><th>Task</th><th>Instance</th><th>Outcome</th><th>Started</th><th>Duration</th><th>Node</th><th>Payload</th><th>Error</th></tr></thead>
         <tbody>
         @if(page.items().isEmpty())
-            <tr><td colspan="7" class="empty">No history entries match this filter.</td></tr>
+            <tr><td colspan="8" class="empty">No history entries match this filter.</td></tr>
         @endif
         @for(var h : page.items())
             <tr>
@@ -18,6 +19,11 @@
                 <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(h.startedAt())}</td>
                 <td class="num">${io.github.logicsatinn.dbscheduler.console.web.Fmt.duration(h.durationMs())}</td>
                 <td>${h.pickedBy()}</td>
+                <td>
+                    @if(h.taskData() != null)
+                        <details><summary>${h.taskDataType()}</summary><pre>${taskData.render(h.taskData())}</pre></details>
+                    @endif
+                </td>
                 <td>
                     @if(h.stacktrace() != null)
                         <details class="stack"><summary>${h.exceptionMessage()}</summary><pre>${h.stacktrace()}</pre></details>

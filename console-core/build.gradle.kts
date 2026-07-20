@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    jacoco
     alias(libs.plugins.jte)
     alias(libs.plugins.mavenPublish)
 }
@@ -64,6 +65,39 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("containers")
     }
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            includes = listOf(
+                "io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository",
+                "io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository",
+                "io.github.logicsatinn.dbscheduler.console.service.ConsoleSchedulerListener",
+                "io.github.logicsatinn.dbscheduler.console.service.ExecutionActions",
+                "io.github.logicsatinn.dbscheduler.console.service.ExecutionsService",
+                "io.github.logicsatinn.dbscheduler.console.service.FailedExecutionParking"
+            )
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.85".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
 }
 
 val containerTest by tasks.registering(Test::class) {

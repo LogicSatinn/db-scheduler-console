@@ -70,7 +70,7 @@ table.data td { padding: 8px; border-bottom: 1px solid var(--grid); vertical-ali
 table.data td.num, table.data td.time { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--axis); color: var(--ink-2); white-space: nowrap; }
 .state.running { border-color: var(--accent); color: var(--accent); }
-.state.failing, .state.failed { border-color: var(--status-critical); color: var(--status-critical); }
+.state.retrying, .state.failed { border-color: var(--status-critical); color: var(--status-critical); }
 .state.succeeded { border-color: var(--status-good); color: var(--status-good); }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: flex-end; }
 .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--ink-2); }

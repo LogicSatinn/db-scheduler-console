@@ -7,7 +7,7 @@ plugins {
 
 allprojects {
     group = "io.github.logicsatinn"
-    version = "0.1.0-M1"
+    version = "0.1.0-M2-SNAPSHOT"
 
     // Spring MVC resolves @PathVariable/@RequestParam names reflectively; without -parameters
     // (which the Spring Boot Gradle plugin would add, and which we do not apply here) those
