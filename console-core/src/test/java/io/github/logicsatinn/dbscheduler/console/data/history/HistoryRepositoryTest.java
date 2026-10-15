@@ -3,6 +3,7 @@ package io.github.logicsatinn.dbscheduler.console.data.history;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
+import io.github.logicsatinn.dbscheduler.console.data.NonAutoCommitDataSource;
 import io.github.logicsatinn.dbscheduler.console.data.Page;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -102,6 +103,18 @@ class HistoryRepositoryTest {
         int purged = repo.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS));
         assertThat(purged).isEqualTo(1);
         assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(3);
+    }
+
+    @Test
+    void insertAndPurgeCommitWhenConnectionsDisableAutoCommit() {
+        var writes = new HistoryRepository(new NonAutoCommitDataSource(ds), Dialect.H2);
+
+        writes.insert(entry("email", "old", HistoryEntry.Outcome.SUCCEEDED, NOW.minus(30, ChronoUnit.DAYS), null));
+        writes.insert(entry("email", "new", HistoryEntry.Outcome.SUCCEEDED, NOW.minusSeconds(10), null));
+        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(2);
+
+        assertThat(writes.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS))).isEqualTo(1);
+        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
     }
 
     @Test

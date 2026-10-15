@@ -3,10 +3,13 @@ package io.github.logicsatinn.dbscheduler.console.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
+import com.github.kagkarlsson.scheduler.serializer.Serializer;
+import com.github.kagkarlsson.scheduler.task.Task;
 import com.github.kagkarlsson.scheduler.task.helper.OneTimeTask;
 import com.github.kagkarlsson.scheduler.task.helper.Tasks;
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
+import io.github.logicsatinn.dbscheduler.console.data.NonAutoCommitDataSource;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -16,8 +19,11 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ExecutionActionsTest {
 
@@ -93,6 +99,29 @@ class ExecutionActionsTest {
                 new ExecutionActions.InstanceRef("action-task", "missing")));
         assertThat(result.success()).isFalse(); // at least one failure
         assertThat(result.message()).contains("2 succeeded").contains("1 failed");
+    }
+
+    @Test
+    void actionsCommitWhenConnectionsDisableAutoCommit() {
+        // Wired the way db-scheduler's Spring Boot starter builds its client.
+        DataSource nonAutoCommit = new NonAutoCommitDataSource(ds);
+        SchedulerClient bootClient = SchedulerClient.Builder.create(
+                new TransactionAwareDataSourceProxy(nonAutoCommit), TASK).build();
+        var bootActions = new ExecutionActions(bootClient, Clock.fixed(NOW, ZoneOffset.UTC),
+                null, Serializer.DEFAULT_JAVA_SERIALIZER, List.<Task<?>>of(TASK),
+                new TransactionTemplate(new DataSourceTransactionManager(nonAutoCommit)));
+        scheduleAt("run", NOW.plus(2, ChronoUnit.HOURS));
+        scheduleAt("move", NOW.plus(2, ChronoUnit.HOURS));
+        scheduleAt("drop", NOW.plus(2, ChronoUnit.HOURS));
+        Instant target = NOW.plus(1, ChronoUnit.DAYS);
+
+        assertThat(bootActions.runNow("action-task", "run").success()).isTrue();
+        assertThat(bootActions.reschedule("action-task", "move", target).success()).isTrue();
+        assertThat(bootActions.delete("action-task", "drop").success()).isTrue();
+
+        assertThat(repo.find("action-task", "run").orElseThrow().executionTime()).isEqualTo(NOW);
+        assertThat(repo.find("action-task", "move").orElseThrow().executionTime()).isEqualTo(target);
+        assertThat(repo.find("action-task", "drop")).isEmpty();
     }
 
     @Test

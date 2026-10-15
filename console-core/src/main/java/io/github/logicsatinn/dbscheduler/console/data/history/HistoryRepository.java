@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 public class HistoryRepository {
 
@@ -32,11 +34,14 @@ public class HistoryRepository {
             + "exception_class, exception_message, stacktrace, picked_by";
 
     private final JdbcTemplate jdbc;
+    /** Writes commit explicitly: pools may hand out auto-commit=false connections. */
+    private final TransactionTemplate transaction;
     private final Dialect dialect;
     private volatile Schema detectedSchema;
 
     public HistoryRepository(DataSource dataSource, Dialect dialect) {
         this.jdbc = new JdbcTemplate(dataSource);
+        this.transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         this.dialect = dialect;
     }
 
@@ -101,12 +106,12 @@ public class HistoryRepository {
             params.add(e.taskData());
             params.add(truncate(e.taskDataType(), 512));
         }
-        jdbc.update("INSERT INTO " + TABLE
+        transaction.executeWithoutResult(status -> jdbc.update("INSERT INTO " + TABLE
                         + " (task_name, task_instance, outcome, started_at, finished_at, duration_ms,"
                         + " exception_class, exception_message, stacktrace, picked_by"
                         + payloadColumns + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
                         + payloadValues + ")",
-                params.toArray());
+                params.toArray()));
     }
 
     public Page<HistoryEntry> page(HistoryFilter f) {
@@ -192,8 +197,9 @@ public class HistoryRepository {
     }
 
     public int purgeOlderThan(Instant cutoff) {
-        return jdbc.update("DELETE FROM " + TABLE + " WHERE finished_at < ?",
-                dialect.jdbcTimestamp(cutoff));
+        Integer purged = transaction.execute(status -> jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE finished_at < ?", dialect.jdbcTimestamp(cutoff)));
+        return purged == null ? 0 : purged;
     }
 
     public OutcomeCounts countsSince(Instant since) {
