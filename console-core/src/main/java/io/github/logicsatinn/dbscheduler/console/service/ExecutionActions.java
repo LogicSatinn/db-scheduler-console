@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionOperations;
 
 /** All mutations go through SchedulerClient so optimistic locking is respected. */
 public class ExecutionActions {
@@ -21,6 +22,7 @@ public class ExecutionActions {
     private final FailedExecutionRepository failedExecutions;
     private final Serializer serializer;
     private final Map<String, Task<?>> tasksByName;
+    private final TransactionOperations transactions;
 
     public ExecutionActions(SchedulerClient client, Clock clock) {
         this(client, clock, null, Serializer.DEFAULT_JAVA_SERIALIZER, List.of());
@@ -29,12 +31,25 @@ public class ExecutionActions {
     public ExecutionActions(SchedulerClient client, Clock clock,
             FailedExecutionRepository failedExecutions, Serializer serializer,
             List<Task<?>> tasks) {
+        this(client, clock, failedExecutions, serializer, tasks,
+                TransactionOperations.withoutTransaction());
+    }
+
+    /**
+     * {@code transactions} must commit on the scheduler's DataSource. db-scheduler's client never
+     * commits when the pool hands out auto-commit=false connections; it relies on the caller's
+     * transaction instead.
+     */
+    public ExecutionActions(SchedulerClient client, Clock clock,
+            FailedExecutionRepository failedExecutions, Serializer serializer,
+            List<Task<?>> tasks, TransactionOperations transactions) {
         this.client = client;
         this.clock = clock;
         this.failedExecutions = failedExecutions;
         this.serializer = serializer;
         this.tasksByName = tasks.stream().collect(Collectors.toUnmodifiableMap(
                 Task::getName, Function.identity(), (first, duplicate) -> first));
+        this.transactions = transactions;
     }
 
     public record ActionResult(boolean success, String message) {}
@@ -73,8 +88,9 @@ public class ExecutionActions {
 
     private ActionResult rescheduleTo(String taskName, String instanceId, Instant when, String verb) {
         try {
-            boolean ok = client.reschedule(TaskInstanceId.of(taskName, instanceId), when);
-            return ok
+            Boolean ok = transactions.execute(status ->
+                    client.reschedule(TaskInstanceId.of(taskName, instanceId), when));
+            return Boolean.TRUE.equals(ok)
                     ? new ActionResult(true, verb + " succeeded for " + instanceId)
                     : new ActionResult(false, verb + " failed for " + instanceId
                             + " — it is executing right now, was changed concurrently, or no longer exists");
@@ -92,7 +108,8 @@ public class ExecutionActions {
                                 "Delete failed for parked execution " + instanceId
                                         + " — it was changed concurrently or no longer exists");
             }
-            client.cancel(TaskInstanceId.of(taskName, instanceId));
+            transactions.executeWithoutResult(status ->
+                    client.cancel(TaskInstanceId.of(taskName, instanceId)));
             return new ActionResult(true, "Deleted " + instanceId);
         } catch (RuntimeException e) {
             return new ActionResult(false, "Delete failed for " + instanceId

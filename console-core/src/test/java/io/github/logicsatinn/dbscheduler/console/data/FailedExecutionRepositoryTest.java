@@ -152,6 +152,16 @@ class FailedExecutionRepositoryTest {
         assertThat(failed.find("payment", "run-3")).isEmpty();
     }
 
+    @Test
+    void deleteCommitsWhenConnectionsDisableAutoCommit() {
+        parksAndRequeuesPreparation("run-delete");
+        var writes = new FailedExecutionRepository(
+                new NonAutoCommitDataSource(dataSource), "scheduled_tasks", Dialect.H2);
+
+        assertThat(writes.delete("payment", "run-delete")).isTrue();
+        assertThat(failed.find("payment", "run-delete")).isEmpty();
+    }
+
     private void parksAndRequeuesPreparation(String id) {
         Payload payload = new Payload("txn-3");
         var instance = TASK.instance(id, payload);

@@ -164,8 +164,9 @@ public class FailedExecutionRepository {
         if (!tableExists()) {
             return false;
         }
-        return jdbc.update("DELETE FROM " + TABLE
-                        + " WHERE task_name = ? AND task_instance = ?", taskName, instanceId) == 1;
+        Integer deleted = transaction.execute(status -> jdbc.update("DELETE FROM " + TABLE
+                + " WHERE task_name = ? AND task_instance = ?", taskName, instanceId));
+        return deleted != null && deleted == 1;
     }
 
     private void applyFilter(ExecutionFilter filter, StringBuilder where, List<Object> params) {

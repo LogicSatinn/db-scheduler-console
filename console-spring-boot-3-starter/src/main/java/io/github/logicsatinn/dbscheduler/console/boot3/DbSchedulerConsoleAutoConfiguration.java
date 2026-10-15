@@ -34,6 +34,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -66,9 +68,16 @@ public class DbSchedulerConsoleAutoConfiguration {
     @Bean
     ExecutionActions dbSchedulerConsoleExecutionActions(Scheduler scheduler,
             FailedExecutionRepository failedExecutions, List<Task<?>> tasks,
-            ObjectProvider<DbSchedulerCustomizer> customizer) {
+            ObjectProvider<DbSchedulerCustomizer> customizer, DataSource dataSource) {
+        // db-scheduler's client never commits on auto-commit=false connections, so the console
+        // supplies the transaction, on the same DataSource the scheduler was built with.
+        DataSource schedulerDataSource = customizer.stream()
+                .flatMap(candidate -> candidate.dataSource().stream())
+                .findFirst()
+                .orElse(dataSource);
         return new ExecutionActions(scheduler, CLOCK, failedExecutions,
-                effectiveSerializer(customizer), tasks);
+                effectiveSerializer(customizer), tasks,
+                new TransactionTemplate(new DataSourceTransactionManager(schedulerDataSource)));
     }
 
     @Bean

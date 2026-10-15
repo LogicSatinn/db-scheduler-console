@@ -7,7 +7,9 @@ import static org.mockito.Mockito.mock;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
+import com.github.kagkarlsson.scheduler.task.helper.OneTimeTask;
 import com.github.kagkarlsson.scheduler.task.helper.RecurringTask;
+import com.github.kagkarlsson.scheduler.task.helper.Tasks;
 import io.github.logicsatinn.dbscheduler.console.ConsoleAvailability;
 import io.github.logicsatinn.dbscheduler.console.ConsoleProperties;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
@@ -19,12 +21,18 @@ import io.github.logicsatinn.dbscheduler.console.web.HistoryController;
 import io.github.logicsatinn.dbscheduler.console.web.OverviewController;
 import io.github.logicsatinn.dbscheduler.console.web.RecurringController;
 import io.github.logicsatinn.dbscheduler.console.web.StaticAssetsController;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 class DbSchedulerConsoleAutoConfigurationTest {
 
@@ -134,6 +142,42 @@ class DbSchedulerConsoleAutoConfigurationTest {
     }
 
     @Test
+    void actionsCommitWhenThePoolDisablesAutoCommit() {
+        String url = "jdbc:h2:mem:autocommitoff;DB_CLOSE_DELAY=-1";
+        var direct = new JdbcTemplate(new DriverManagerDataSource(url, "sa", ""));
+        direct.execute("create table scheduled_tasks (task_name varchar(250) not null,"
+                + " task_instance varchar(250) not null, task_data blob,"
+                + " execution_time timestamp with time zone not null, picked boolean not null,"
+                + " picked_by varchar(50), last_success timestamp with time zone,"
+                + " last_failure timestamp with time zone, consecutive_failures int,"
+                + " last_heartbeat timestamp with time zone, version bigint not null,"
+                + " priority smallint, primary key (task_name, task_instance))");
+        Instant later = Instant.now().plus(2, ChronoUnit.HOURS);
+        for (String id : List.of("run", "drop")) {
+            direct.update("insert into scheduled_tasks (task_name, task_instance, execution_time,"
+                    + " picked, version) values ('payment', ?, ?, false, 1)", id, Timestamp.from(later));
+        }
+
+        runner.withUserConfiguration(PaymentTaskConfig.class)
+                .withPropertyValues(
+                        "spring.datasource.url=" + url,
+                        "spring.datasource.hikari.auto-commit=false",
+                        "db-scheduler.polling-interval=1h")
+                .run(ctx -> {
+                    var actions = ctx.getBean(ExecutionActions.class);
+                    var runNow = actions.runNow("payment", "run");
+                    assertThat(runNow.success()).as(runNow.message()).isTrue();
+                    var delete = actions.delete("payment", "drop");
+                    assertThat(delete.success()).as(delete.message()).isTrue();
+                });
+
+        assertThat(direct.queryForObject("select execution_time from scheduled_tasks"
+                + " where task_instance = 'run'", Timestamp.class).toInstant()).isBefore(later);
+        assertThat(direct.queryForObject("select count(*) from scheduled_tasks"
+                + " where task_instance = 'drop'", Long.class)).isZero();
+    }
+
+    @Test
     void propertiesBind() {
         runner.withPropertyValues(
                 "db-scheduler-console.read-only=true",
@@ -145,6 +189,14 @@ class DbSchedulerConsoleAutoConfigurationTest {
                   assertThat(props.getHistory().getRetention()).isEqualTo(java.time.Duration.ofDays(7));
                   assertThat(props.getPollingInterval()).isEqualTo(java.time.Duration.ofSeconds(10));
               });
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class PaymentTaskConfig {
+        @Bean
+        OneTimeTask<Void> paymentTask() {
+            return Tasks.oneTime("payment").execute((instance, context) -> { });
+        }
     }
 
     /** An app that builds its own Scheduler without the db-scheduler Boot starter. */
