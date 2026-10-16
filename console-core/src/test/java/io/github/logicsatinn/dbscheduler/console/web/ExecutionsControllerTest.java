@@ -133,6 +133,18 @@ class ExecutionsControllerTest {
     }
 
     @Test
+    void actionFlashesAreNotFilteredByRefreshRegions() throws Exception {
+        insert("email", "order-1", NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+
+        HtmxAssertions.actionFormsDoNotInheritRegionSelect(Jsoup.parse(
+                mvc.perform(get("/db-scheduler-console/executions"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()));
+        HtmxAssertions.actionFormsDoNotInheritRegionSelect(Jsoup.parse(
+                mvc.perform(get("/db-scheduler-console/execution?task=email&id=order-1"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()));
+    }
+
+    @Test
     void missingExecutionIs404() throws Exception {
         mvc.perform(get("/db-scheduler-console/execution?task=email&id=missing"))
                 .andExpect(status().isNotFound());

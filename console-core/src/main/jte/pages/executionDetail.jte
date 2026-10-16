@@ -6,7 +6,7 @@
 @param String selfUrl
 @template.layout(ctx = ctx, title = row.taskName() + " / " + row.instanceId(), content = @`
     <h1>${row.taskName()} <span class="muted">/</span> ${row.instanceId()}</h1>
-    <div hx-get="${selfUrl}" hx-trigger="dsc-refresh from:body" hx-select="#main" hx-target="#main" hx-swap="innerHTML">
+    <div hx-get="${selfUrl}" hx-trigger="dsc-refresh from:body" hx-select="#main" hx-target="#main" hx-swap="innerHTML" hx-disinherit="hx-select">
         <div class="card">
             <h2>Execution</h2>
             <table class="data">
