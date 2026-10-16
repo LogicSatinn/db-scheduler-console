@@ -65,6 +65,31 @@ class HistoryControllerTest {
     }
 
     @Test
+    void firstPagePollsWithItsFiltersAndPausesWhileADetailIsOpen() throws Exception {
+        var region = Jsoup.parse(mvcFor(true).perform(get("/db-scheduler-console/history?outcome=FAILED&q=smtp"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+                .getElementById("history-region");
+
+        assertThat(region.attr("hx-get"))
+                .startsWith("/db-scheduler-console/history?")
+                .contains("outcome=FAILED", "q=smtp");
+        assertThat(region.attr("hx-select")).isEqualTo("#history-region");
+        assertThat(region.attr("hx-swap")).isEqualTo("outerHTML");
+        assertThat(region.attr("hx-trigger"))
+                .startsWith("every 5s [")
+                .contains("details[open]");
+    }
+
+    @Test
+    void olderPagesDoNotPoll() throws Exception {
+        var region = Jsoup.parse(mvcFor(true).perform(get("/db-scheduler-console/history?page=1&size=1"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+                .getElementById("history-region");
+
+        assertThat(region.hasAttr("hx-trigger")).isFalse();
+    }
+
+    @Test
     void instanceLinkIsUrlEncoded() throws Exception {
         var mvc = mvcFor(true);
         repo.insert(new HistoryEntry(0, "email", "order+A&B C", HistoryEntry.Outcome.SUCCEEDED,

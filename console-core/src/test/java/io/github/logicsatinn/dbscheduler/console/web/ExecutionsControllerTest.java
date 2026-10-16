@@ -145,6 +145,25 @@ class ExecutionsControllerTest {
     }
 
     @Test
+    void tablePollsWithItsFiltersAndPausesWhileRowsAreSelected() throws Exception {
+        insert("email", "order-1", NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+
+        var region = Jsoup.parse(mvc.perform(get(
+                        "/db-scheduler-console/executions?state=SCHEDULED&task=email&sort=TASK_NAME&dir=desc"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+                .getElementById("executions-region");
+
+        assertThat(region.attr("hx-get"))
+                .as("relative, so it also works behind an HTTPS proxy")
+                .startsWith("/db-scheduler-console/executions?")
+                .contains("state=SCHEDULED", "task=email", "sort=TASK_NAME", "dir=desc");
+        assertThat(region.attr("hx-trigger"))
+                .startsWith("every 5s [")
+                .contains("input[name=ref]:checked")
+                .endsWith(", dsc-refresh from:body");
+    }
+
+    @Test
     void missingExecutionIs404() throws Exception {
         mvc.perform(get("/db-scheduler-console/execution?task=email&id=missing"))
                 .andExpect(status().isNotFound());

@@ -14,6 +14,7 @@ import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import javax.sql.DataSource;
@@ -106,12 +107,15 @@ class RecurringControllerTest {
     }
 
     @Test
-    void tableReloadsAfterAnAction() throws Exception {
-        Element region = page(new ConsoleProperties()).getElementById("recurring-region");
+    void tableRefreshesOnThePollingIntervalAndAfterAnAction() throws Exception {
+        var props = new ConsoleProperties();
+        props.setPollingInterval(Duration.ofSeconds(1));
+
+        Element region = page(props).getElementById("recurring-region");
 
         assertThat(region).isNotNull();
         assertThat(region.attr("hx-get")).isEqualTo("/db-scheduler-console/recurring");
-        assertThat(region.attr("hx-trigger")).isEqualTo("dsc-refresh from:body");
+        assertThat(region.attr("hx-trigger")).isEqualTo("every 1s, dsc-refresh from:body");
         assertThat(region.attr("hx-select")).isEqualTo("#recurring-region");
         assertThat(region.select("table.data")).hasSize(1);
     }
