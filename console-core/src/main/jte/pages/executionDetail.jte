@@ -6,7 +6,14 @@
 @param String selfUrl
 @template.layout(ctx = ctx, title = row.taskName() + " / " + row.instanceId(), content = @`
     <h1>${row.taskName()} <span class="muted">/</span> ${row.instanceId()}</h1>
-    <div hx-get="${selfUrl}" hx-trigger="dsc-refresh from:body" hx-select="#main" hx-target="#main" hx-swap="innerHTML" hx-disinherit="hx-select">
+    <%-- Polls until the execution leaves the live table; pauses while a reschedule time is being entered
+         or a stack trace is open. Once gone, the response is the executionGone page, whose #detail-live has
+         no polling. A deleted execution with no history answers 404, which htmx only swaps when told to;
+         htmx fires before-swap on the target, so this element must be its own target. --%>
+    <div id="detail-live" hx-get="${selfUrl}"
+         hx-trigger="every ${ctx.pollSeconds()}s [!this.querySelector('details[open], input[name=when]:focus, input[name=when]:valid')], dsc-refresh from:body"
+         hx-on::before-swap="if (event.detail.xhr.status === 404) { event.detail.shouldSwap = true; event.detail.isError = false; }"
+         hx-select="#detail-live" hx-swap="outerHTML" hx-disinherit="hx-select">
         <div class="card">
             <h2>Execution</h2>
             <table class="data">
@@ -58,32 +65,6 @@
                 </form>
             </div>
         @endif
-        <div class="card">
-            <h2>History</h2>
-            @if(historyEntries.isEmpty())
-                <div class="empty">No recorded history for this instance.</div>
-            @else
-                <table class="data">
-                    <thead><tr><th>Outcome</th><th>Started</th><th>Duration</th><th>Node</th><th>Error</th></tr></thead>
-                    <tbody>
-                    @for(var h : historyEntries)
-                        <tr>
-                            <td><span class="state ${h.outcome().name().toLowerCase()}">${h.outcome().name()}</span></td>
-                            <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(h.startedAt())}</td>
-                            <td class="num">${io.github.logicsatinn.dbscheduler.console.web.Fmt.duration(h.durationMs())}</td>
-                            <td>${h.pickedBy()}</td>
-                            <td>
-                                @if(h.stacktrace() != null)
-                                    <details class="stack"><summary>${h.exceptionMessage()}</summary><pre>${h.stacktrace()}</pre></details>
-                                @else
-                                    ${h.exceptionMessage()}
-                                @endif
-                            </td>
-                        </tr>
-                    @endfor
-                    </tbody>
-                </table>
-            @endif
-        </div>
+        @template.fragments.instanceHistory(historyEntries = historyEntries)
     </div>
 `)
