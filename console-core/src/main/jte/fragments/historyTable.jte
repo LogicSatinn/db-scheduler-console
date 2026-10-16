@@ -4,7 +4,12 @@
 @param io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter filter
 @param String queryBase
 @param io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer taskData
-<div id="history-region">
+!{boolean live = filter.page() == 0;}
+<%-- Only the newest page polls. Without hx-trigger, a div's hx-get would fire on click, so older pages get neither. --%>
+<div id="history-region"
+     hx-get="${live ? ctx.basePath() + "/history" + queryBase : null}"
+     hx-trigger="${live ? "every " + ctx.pollSeconds() + "s [!this.querySelector('details[open]')]" : null}"
+     hx-select="#history-region" hx-swap="outerHTML">
     <table class="data">
         <thead><tr><th>Task</th><th>Instance</th><th>Outcome</th><th>Started</th><th>Duration</th><th>Node</th><th>Payload</th><th>Error</th></tr></thead>
         <tbody>

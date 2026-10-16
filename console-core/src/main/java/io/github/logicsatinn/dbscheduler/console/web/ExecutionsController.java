@@ -79,7 +79,8 @@ public class ExecutionsController {
         model.put("taskNames", executions.distinctTaskNames());
         model.put("now", now);
         model.put("queryBase", queryBase(state, task, q, from, to, size));
-        model.put("refreshUrl", request.getRequestURL() + queryBase(state, task, q, from, to, size)
+        // Path only: an absolute URL breaks behind a TLS-terminating proxy (htmx refuses cross-origin).
+        model.put("refreshUrl", request.getRequestURI() + queryBase(state, task, q, from, to, size)
                 + "&sort=" + sortColumn.name() + "&dir=" + (desc ? "desc" : "asc")
                 + "&page=" + Math.max(0, page));
         return templates.page("pages/executions.jte", model);

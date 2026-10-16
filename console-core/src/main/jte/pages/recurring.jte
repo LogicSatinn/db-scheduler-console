@@ -4,7 +4,7 @@
 @template.layout(ctx = ctx, title = "Recurring tasks", content = @`
     <h1>Task definitions</h1>
     <div class="card" id="recurring-region"
-         hx-get="${ctx.basePath()}/recurring" hx-trigger="dsc-refresh from:body"
+         hx-get="${ctx.basePath()}/recurring" hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body"
          hx-select="#recurring-region" hx-swap="outerHTML" hx-disinherit="hx-select">
         @if(rows.isEmpty())
             <div class="empty">No task beans found in the application context.</div>
