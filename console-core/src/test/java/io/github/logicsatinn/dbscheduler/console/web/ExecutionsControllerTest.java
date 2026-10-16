@@ -164,8 +164,50 @@ class ExecutionsControllerTest {
     }
 
     @Test
+    void liveDetailPollsAndPausesWhileReschedulingOrReadingAStacktrace() throws Exception {
+        insert("email", "order-1", NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=order-1"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var region = doc.getElementById("detail-live");
+
+        assertThat(region).isNotNull();
+        assertThat(region.attr("hx-select")).isEqualTo("#detail-live");
+        assertThat(region.attr("hx-swap")).isEqualTo("outerHTML");
+        assertThat(region.hasAttr("hx-target"))
+                .as("htmx fires before-swap on the target, so the region must be its own target")
+                .isFalse();
+        assertThat(region.attr("hx-trigger"))
+                .startsWith("every 5s [")
+                .contains("details[open]", "input[name=when]:focus", "input[name=when]:valid")
+                .endsWith(", dsc-refresh from:body");
+        assertThat(region.attr("hx-on::before-swap"))
+                .as("a job that vanished answers 404, which htmx would otherwise not show")
+                .contains("404");
+    }
+
+    @Test
+    void finishedExecutionShowsItsOutcomeAndHistoryAndStopsPolling() throws Exception {
+        history.insert(new HistoryEntry(0, "email", "order-9", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000, null, null, null, "node-1"));
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=order-9"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertThat(doc.select("h1").text()).contains("email").contains("order-9");
+        assertThat(doc.select("#detail-live").text()).contains("Finished").contains("SUCCEEDED");
+        assertThat(doc.select("#detail-live table.data tbody tr")).hasSize(1);
+        assertThat(doc.select("[hx-trigger]")).isEmpty();
+    }
+
+    @Test
     void missingExecutionIs404() throws Exception {
-        mvc.perform(get("/db-scheduler-console/execution?task=email&id=missing"))
-                .andExpect(status().isNotFound());
+        var html = mvc.perform(get("/db-scheduler-console/execution?task=email&id=missing"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(Jsoup.parse(html).select("#detail-live").text())
+                .as("rendered as the region a polling detail page swaps in")
+                .contains("not found");
     }
 }

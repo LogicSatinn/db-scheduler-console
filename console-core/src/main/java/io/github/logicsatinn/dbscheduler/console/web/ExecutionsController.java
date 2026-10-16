@@ -3,6 +3,7 @@ package io.github.logicsatinn.dbscheduler.console.web;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionState;
 import io.github.logicsatinn.dbscheduler.console.data.SortColumn;
+import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
@@ -90,18 +91,24 @@ public class ExecutionsController {
     public ResponseEntity<String> detail(@RequestParam String task, @RequestParam String id,
             HttpServletRequest request) {
         var row = executions.find(task, id);
+        var historyEntries = stats.historyAvailable() ? history.forInstance(task, id, 50) : List.<HistoryEntry>of();
         if (row.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            // Finished executions leave the live table; show their outcome instead of a dead end.
+            var gone = Map.<String, Object>of(
+                    "ctx", ctxFactory.page("executions", request),
+                    "taskName", task,
+                    "instanceId", id,
+                    "historyEntries", historyEntries);
+            return ResponseEntity.status(historyEntries.isEmpty() ? HttpStatus.NOT_FOUND : HttpStatus.OK)
                     .contentType(MediaType.valueOf("text/html;charset=UTF-8"))
-                    .body("<p>Execution not found: it may have completed and left the live table.</p>");
+                    .body(templates.render("pages/executionGone.jte", gone));
         }
         Map<String, Object> model = new HashMap<>();
         model.put("ctx", ctxFactory.page("executions", request));
         model.put("row", row.get());
         model.put("now", clock.instant());
         model.put("dataPreview", taskData.render(row.get().taskData()));
-        model.put("historyEntries", stats.historyAvailable()
-                ? history.forInstance(task, id, 50) : List.of());
+        model.put("historyEntries", historyEntries);
         model.put("selfUrl", ctxFactory.page("executions", request).basePath()
                 + "/execution?task=" + Fmt.url(task) + "&id=" + Fmt.url(id));
         return templates.page("pages/executionDetail.jte", model);
