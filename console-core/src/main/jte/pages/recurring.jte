@@ -3,7 +3,9 @@
 @param java.util.List<io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService.Row> rows
 @template.layout(ctx = ctx, title = "Recurring tasks", content = @`
     <h1>Task definitions</h1>
-    <div class="card">
+    <div class="card" id="recurring-region"
+         hx-get="${ctx.basePath()}/recurring" hx-trigger="dsc-refresh from:body"
+         hx-select="#recurring-region" hx-swap="outerHTML" hx-disinherit="hx-select">
         @if(rows.isEmpty())
             <div class="empty">No task beans found in the application context.</div>
         @else
@@ -23,7 +25,16 @@
                                 <span class="muted">—</span>
                             @endif
                         </td>
-                        <td><a href="${ctx.basePath()}/history?task=${Fmt.url(row.taskName())}">history</a></td>
+                        <td>
+                            @if(!ctx.readOnly() && row.runNowInstance() != null)
+                                <form style="display:inline" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
+                                    <input type="hidden" name="task" value="${row.taskName()}">
+                                    <input type="hidden" name="id" value="${row.runNowInstance()}">
+                                    <button type="submit">Run now</button>
+                                </form>
+                            @endif
+                            <a href="${ctx.basePath()}/history?task=${Fmt.url(row.taskName())}">history</a>
+                        </td>
                     </tr>
                 @endfor
                 </tbody>

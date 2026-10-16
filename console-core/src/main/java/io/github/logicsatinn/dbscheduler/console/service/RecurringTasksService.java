@@ -25,7 +25,16 @@ public class RecurringTasksService {
         this.history = history;
     }
 
-    public record Row(String taskName, String type, Instant nextExecution, HistoryEntry lastRun) {}
+    public record Row(String taskName, String type, Instant nextExecution, HistoryEntry lastRun) {
+
+        /**
+         * The live instance "Run now" can move, or null: one-time definitions have no single
+         * instance, and a running recurring task has no unpicked row (nextExecution is null).
+         */
+        public String runNowInstance() {
+            return "Recurring".equals(type) && nextExecution != null ? RecurringTask.INSTANCE : null;
+        }
+    }
 
     public List<Row> rows() {
         // Two batched queries, not two per task.
