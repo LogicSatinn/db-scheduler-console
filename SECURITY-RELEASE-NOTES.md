@@ -14,7 +14,10 @@ This pre-release update changes integration defaults and pagination APIs.
   requests are rejected. Configure the external origin when proxy request metadata differs.
 - Bulk requests exceeding 200 or containing invalid references are rejected before any mutation.
 - Dynamic responses prohibit caching and framing by default. Host embedding is explicit opt-in.
-- htmx snapshots are disabled; deploy targeted old-snapshot cleanup to host logout/rollout pages.
+- The bundled htmx is upgraded from 2 to 4. htmx 4 stores no history snapshots and back/forward
+  navigation reloads the page; deploy targeted cleanup of old htmx 2 snapshots to host logout/rollout
+  pages. Host pages that embed console markup or drive it with htmx 2 event names must move to
+  htmx 4 (`htmx:before:request`, `htmx:before:swap`, `hx-headers:inherited`).
 - Examples require supplied credentials, bind locally and deny unmatched routes. Their security
   matchers now follow the configured base path, including its root.
 

@@ -22,7 +22,7 @@
           hx-get="${ctx.basePath()}/history"
           hx-target="#history-region" hx-select="#history-region" hx-swap="outerHTML"
           hx-push-url="true"
-          hx-trigger="change, submit, input delay:500ms from:find input[name='q']">
+          hx-trigger="change, submit, input delay:500ms from:'find input[name=q]'">
         <label>Task
             <input type="search" name="task" value="${filter.taskName()}" placeholder="task name">
         </label>

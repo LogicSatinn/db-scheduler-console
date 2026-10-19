@@ -8,7 +8,7 @@
     <h1>${row.taskName()} <span class="muted">/</span> ${row.instanceId()}</h1>
     <div id="detail-live" hx-get="${selfUrl}"
          hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body"
-         hx-select="#detail-live" hx-swap="outerHTML" hx-disinherit="hx-select">
+         hx-select="#detail-live" hx-swap="outerHTML">
         <div class="card">
             <h2>Execution</h2>
             <table class="data">

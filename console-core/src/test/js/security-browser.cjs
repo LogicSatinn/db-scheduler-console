@@ -40,10 +40,20 @@ const csp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 's
     });
     await page.goto(origin + base + '/history');
     await page.waitForFunction(() => typeof htmx !== 'undefined');
-    assert.equal(await page.locator('body').getAttribute('hx-history'), 'false');
-    assert.equal(await page.evaluate(() => htmx.config.allowEval), false);
-    assert.equal(await page.evaluate(() => htmx.config.includeIndicatorStyles), false);
-    assert.equal(await page.locator('[onclick], [style], [hx-on\\:\\:before-swap]').count(), 0);
+    assert.ok((await page.evaluate(() => htmx.version)).startsWith('4.'));
+    assert.equal(await page.evaluate(() => htmx.config.history), 'reload');
+    assert.equal(await page.evaluate(() => htmx.config.includeIndicatorCSS), false);
+    assert.equal(await page.locator('[onclick], [style], [hx-on\\:\\:before\\:swap]').count(), 0);
+    assert.equal(await page.evaluate(async () => {
+      const probe = document.createElement('button');
+      probe.setAttribute('hx-on:click', 'window.htmxEvaluated = true');
+      document.body.append(probe);
+      htmx.process(probe);
+      probe.click();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      probe.remove();
+      return window.htmxEvaluated === true;
+    }), false, 'htmx evaluation must stay disabled');
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('htmx-history-cache')).map(e=>e.url)), ['/unrelated']);
     assert.equal(payloadRequests, 0);
     const preview = page.locator('details[data-payload-url]').first();

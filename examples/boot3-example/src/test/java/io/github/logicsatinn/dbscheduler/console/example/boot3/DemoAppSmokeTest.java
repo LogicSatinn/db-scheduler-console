@@ -88,7 +88,7 @@ class DemoAppSmokeTest {
                 .isEqualTo(403);
 
         String headers = Jsoup.parse(get("/operations/executions"))
-                .selectFirst("body").attr("hx-headers");
+                .selectFirst("body").attr("hx-headers:inherited");
         var matcher = CSRF.matcher(headers);
         assertThat(matcher.matches()).isTrue();
         assertThat(post("/operations/actions/run-now",

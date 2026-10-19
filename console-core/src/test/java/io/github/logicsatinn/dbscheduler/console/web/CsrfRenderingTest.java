@@ -40,7 +40,7 @@ class CsrfRenderingTest {
                         .requestAttr(CsrfToken.class.getName(),
                                 new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "token-123")))
                 .andReturn().getResponse().getContentAsString();
-        assertThat(body).contains("hx-headers").contains("X-CSRF-TOKEN").contains("token-123");
+        assertThat(body).contains("hx-headers:inherited").contains("X-CSRF-TOKEN").contains("token-123");
 
         var without = mvc.perform(get("/db-scheduler-console/overview"))
                 .andReturn().getResponse().getContentAsString();
