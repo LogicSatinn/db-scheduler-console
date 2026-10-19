@@ -32,8 +32,15 @@ public class StatsService {
         this.clock = clock;
     }
 
-    public record Tiles(long scheduled, long due, long running, long retrying, long failed,
-                        long succeeded24h, long failed24h) {}
+    public record Tiles(
+            long scheduled,
+            long due,
+            long running,
+            long retrying,
+            long failed,
+            long succeeded24h,
+            long failed24h
+    ) {}
 
     public record HourBucket(Instant hourStart, long succeeded, long failed) {}
 
