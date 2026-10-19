@@ -9,7 +9,7 @@
 !{var sortDir = filter.descending() ? "asc" : "desc";}
 <div id="executions-region"
      hx-get="${refreshUrl}"
-     hx-trigger="every ${ctx.pollSeconds()}s [!this.querySelector('input[name=ref]:checked')], dsc-refresh from:body"
+     hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body"
      hx-select="#executions-region" hx-swap="outerHTML" hx-disinherit="hx-select">
     @if(!ctx.readOnly())
         <form id="bulk-form" hx-post="${ctx.basePath()}/actions/bulk" hx-target="#flash" hx-swap="innerHTML">
@@ -53,12 +53,12 @@
                 <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastHeartbeat())}</td>
                 <td>
                     @if(!ctx.readOnly())
-                        <form style="display:inline" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
+                        <form class="inline-form" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">
                             <input type="hidden" name="id" value="${row.instanceId()}">
                             <button type="submit">${row.parked() ? "Requeue" : "Run now"}</button>
                         </form>
-                        <form style="display:inline" hx-post="${ctx.basePath()}/actions/delete" hx-confirm="Delete this execution?" hx-target="#flash" hx-swap="innerHTML">
+                        <form class="inline-form" hx-post="${ctx.basePath()}/actions/delete" hx-confirm="Delete this execution?" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">
                             <input type="hidden" name="id" value="${row.instanceId()}">
                             <button type="submit" class="danger">Delete</button>
@@ -70,12 +70,12 @@
         </tbody>
     </table>
     <div class="pagination">
-        @if(filter.page() > 0)
-            <a href="${base}/executions${queryBase}&sort=${filter.sort().name()}&dir=${filter.descending() ? "desc" : "asc"}&page=${filter.page() - 1}">‹ Prev</a>
+        @if(page.previousCursor() != null)
+            <a href="${base + "/executions" + queryBase + "&sort=" + filter.sort().name() + "&dir=" + (filter.descending() ? "desc" : "asc")}&cursor=${Fmt.url(page.previousCursor())}">‹ Previous</a>
         @endif
-        <span>Page ${filter.page() + 1} of ${Math.max(1, page.totalPages())} · ${page.total()} total</span>
-        @if(filter.page() + 1 < page.totalPages())
-            <a href="${base}/executions${queryBase}&sort=${filter.sort().name()}&dir=${filter.descending() ? "desc" : "asc"}&page=${filter.page() + 1}">Next ›</a>
+        <span>${page.items().size()} entries</span>
+        @if(page.nextCursor() != null)
+            <a href="${base + "/executions" + queryBase + "&sort=" + filter.sort().name() + "&dir=" + (filter.descending() ? "desc" : "asc")}&cursor=${Fmt.url(page.nextCursor())}">Next ›</a>
         @endif
     </div>
 </div>

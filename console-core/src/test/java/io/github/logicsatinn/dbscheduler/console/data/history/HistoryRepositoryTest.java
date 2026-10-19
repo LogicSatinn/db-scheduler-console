@@ -55,18 +55,18 @@ class HistoryRepositoryTest {
         repo.insert(entry("email", "2", HistoryEntry.Outcome.FAILED, NOW.minusSeconds(50), "SMTP timeout"));
         repo.insert(entry("report", "3", HistoryEntry.Outcome.SUCCEEDED, NOW.minusSeconds(40), null));
 
-        Page<HistoryEntry> all = repo.page(new HistoryFilter(null, null, null, null, null, 0, 10));
-        assertThat(all.total()).isEqualTo(3);
+        Page<HistoryEntry> all = repo.page(new HistoryFilter(null, null, null, null, null, null, 10));
+        assertThat(all.items().size()).isEqualTo(3);
         assertThat(all.items().get(0).instanceId()).isEqualTo("3");
 
-        Page<HistoryEntry> failed = repo.page(new HistoryFilter(null, HistoryEntry.Outcome.FAILED, null, null, null, 0, 10));
+        Page<HistoryEntry> failed = repo.page(new HistoryFilter(null, HistoryEntry.Outcome.FAILED, null, null, null, null, 10));
         assertThat(failed.items()).hasSize(1);
         assertThat(failed.items().get(0).exceptionMessage()).isEqualTo("SMTP timeout");
 
-        Page<HistoryEntry> text = repo.page(new HistoryFilter(null, null, "smtp", null, null, 0, 10));
+        Page<HistoryEntry> text = repo.page(new HistoryFilter(null, null, "smtp", null, null, null, 10));
         assertThat(text.items()).hasSize(1);
 
-        Page<HistoryEntry> byTask = repo.page(new HistoryFilter("report", null, null, null, null, 0, 10));
+        Page<HistoryEntry> byTask = repo.page(new HistoryFilter("report", null, null, null, null, null, 10));
         assertThat(byTask.items()).hasSize(1);
     }
 
@@ -75,7 +75,7 @@ class HistoryRepositoryTest {
         String longMsg = "x".repeat(5000);
         repo.insert(new HistoryEntry(0, "t", "1", HistoryEntry.Outcome.FAILED,
                 NOW, NOW.plusSeconds(1), 1000, "E", longMsg, longMsg.repeat(10), "n"));
-        HistoryEntry saved = repo.page(new HistoryFilter(null, null, null, null, null, 0, 1)).items().get(0);
+        HistoryEntry saved = repo.page(new HistoryFilter(null, null, null, null, null, null, 1)).items().get(0);
         assertThat(saved.exceptionMessage()).hasSize(2000);
         assertThat(saved.stacktrace()).hasSize(30000);
     }
@@ -101,7 +101,7 @@ class HistoryRepositoryTest {
 
         int purged = repo.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS));
         assertThat(purged).isEqualTo(1);
-        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(3);
+        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, null, 10)).items().size()).isEqualTo(3);
     }
 
     @Test
@@ -110,10 +110,10 @@ class HistoryRepositoryTest {
 
         writes.insert(entry("email", "old", HistoryEntry.Outcome.SUCCEEDED, NOW.minus(30, ChronoUnit.DAYS), null));
         writes.insert(entry("email", "new", HistoryEntry.Outcome.SUCCEEDED, NOW.minusSeconds(10), null));
-        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(2);
+        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, null, 10)).items().size()).isEqualTo(2);
 
         assertThat(writes.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS))).isEqualTo(1);
-        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
+        assertThat(repo.page(new HistoryFilter(null, null, null, null, null, null, 10)).items().size()).isEqualTo(1);
     }
 
     @Test
@@ -162,7 +162,8 @@ class HistoryRepositoryTest {
                 null, null, null, "node", null, null));
 
         HistoryEntry saved = repo.forInstance("email", "payload", 1).get(0);
-        assertThat(saved.taskData()).containsExactly(payload);
+        assertThat(saved.taskData()).isNull();
+        assertThat(repo.payload(saved.id(), 65536)).containsExactly(payload);
         assertThat(saved.taskDataType()).isEqualTo("example.PayloadV1");
         assertThat(repo.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS))).isEqualTo(1);
         assertThat(repo.forInstance("email", "payload", 1)).hasSize(1);
@@ -200,4 +201,24 @@ class HistoryRepositoryTest {
         legacy.refreshSchema();
         assertThat(legacy.schema()).isEqualTo(HistoryRepository.Schema.CURRENT);
     }
+    @Test
+    void payloadReadsAreBoundedAndListQueriesDoNotFetchBytes() {
+        repo.insert(new HistoryEntry(0, "task", "large", HistoryEntry.Outcome.SUCCEEDED,
+                NOW, NOW, 0, null, null, null, null, new byte[100000], "bytes"));
+        var row = repo.page(HistoryFilter.none(null, 10)).items().get(0);
+        assertThat(row.taskData()).isNull();
+        assertThat(repo.payload(row.id(), 64)).hasSize(65);
+    }
+
+    @Test
+    void hostSanitizerRedactsNewAndExistingDiagnosticsAndFailsClosed() {
+        repo.insert(entry("task", "old", HistoryEntry.Outcome.FAILED, NOW, "secret"));
+        var redacted = new HistoryRepository(ds, Dialect.H2, text -> text.replace("secret", "[redacted]"));
+        assertThat(redacted.forInstance("task", "old", 1).get(0).exceptionMessage()).isEqualTo("[redacted]");
+        redacted.insert(entry("task", "new", HistoryEntry.Outcome.FAILED, NOW, "secret"));
+        assertThat(repo.forInstance("task", "new", 1).get(0).exceptionMessage()).isEqualTo("[redacted]");
+        var broken = new HistoryRepository(ds, Dialect.H2, text -> { throw new IllegalStateException(); });
+        assertThat(broken.forInstance("task", "old", 1).get(0).exceptionMessage()).isEqualTo("[diagnostic redacted]");
+    }
+
 }

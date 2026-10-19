@@ -44,9 +44,13 @@ class ActionsControllerTest {
         client = SchedulerClient.Builder.create(ds, TASK).build();
         repo = new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
         props = new ConsoleProperties();
+        props.setReadOnly(false);
         var controller = new ActionsController(props, new TemplateRenderer(),
                 new ExecutionActions(client, Clock.fixed(NOW, ZoneOffset.UTC)));
         mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ConsoleErrors())
+                .addInterceptors(new ConsoleRequestInterceptor(props))
+                .defaultRequest(post("/").header("HX-Request", "true"))
                 .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")
                 .build();
     }
@@ -107,4 +111,38 @@ class ActionsControllerTest {
         assertThat(repo.find("action-task", "a").orElseThrow().executionTime())
                 .isEqualTo(NOW.plus(1, ChronoUnit.HOURS));
     }
+    @Test
+    void rejectsMalformedAndOversizedBatchesBeforeAnyMutation() throws Exception {
+        client.scheduleIfNotExists(TASK.instance("a"), NOW.plusSeconds(3600));
+        mvc.perform(post("/db-scheduler-console/actions/bulk").param("kind", "DELETE")
+                .param("ref", "action-task::a", "malformed")).andExpect(status().isBadRequest());
+        mvc.perform(post("/db-scheduler-console/actions/bulk").param("kind", "BAD")
+                .param("ref", "action-task::a")).andExpect(status().isBadRequest());
+        mvc.perform(post("/db-scheduler-console/actions/bulk").param("kind", "DELETE")
+                .param("ref", java.util.Collections.nCopies(201, "action-task::a").toArray(String[]::new)))
+                .andExpect(status().isBadRequest());
+        assertThat(repo.find("action-task", "a")).isPresent();
+    }
+    @Test
+    void rejectsCrossOriginAndMissingCustomHeader() throws Exception {
+        client.scheduleIfNotExists(TASK.instance("a"), NOW.plusSeconds(3600));
+        for (var request : java.util.List.of(
+                post("/db-scheduler-console/actions/delete").header("Origin", "https://attacker.example"),
+                post("/db-scheduler-console/actions/delete").header("Sec-Fetch-Site", "cross-site"),
+                post("/db-scheduler-console/actions/delete").header("HX-Request", "false"))) {
+            mvc.perform(request.param("task", "action-task").param("id", "a"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(header().string("Cache-Control", "no-store"));
+        }
+        assertThat(repo.find("action-task", "a")).isPresent();
+    }
+    @Test
+    void acceptsExactlyTwoHundredReferencesAndDeduplicates() throws Exception {
+        client.scheduleIfNotExists(TASK.instance("a"), NOW.plusSeconds(3600));
+        String body = mvc.perform(post("/db-scheduler-console/actions/bulk").param("kind", "RUN_NOW")
+                .param("ref", java.util.Collections.nCopies(200, "action-task::a").toArray(String[]::new)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("1 succeeded");
+    }
+
 }

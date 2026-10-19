@@ -51,8 +51,8 @@ class SchedulerHistoryIntegrationTest {
         scheduler.scheduleIfNotExists(boom.instance("2"), Instant.now());
 
         Awaitility.await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
-            var page = history.page(new HistoryFilter(null, null, null, null, null, 0, 10));
-            assertThat(page.total()).isEqualTo(2);
+            var page = history.page(new HistoryFilter(null, null, null, null, null, null, 10));
+            assertThat(page.items().size()).isEqualTo(2);
         });
 
         var failures = history.recentFailures(5);

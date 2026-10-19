@@ -6,10 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.dao.ConcurrencyFailureException;
@@ -28,12 +25,19 @@ public class FailedExecutionRepository {
             "task_name, task_instance, task_data, task_data_type, priority, failure_count, "
             + "failed_at, picked_by, exception_class, exception_message, stacktrace";
 
+    private final DiagnosticSanitizer sanitizer;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final String scheduledTable;
     private final Dialect dialect;
 
     public FailedExecutionRepository(DataSource dataSource, String scheduledTable, Dialect dialect) {
+        this(dataSource, scheduledTable, dialect, DiagnosticSanitizer.IDENTITY);
+    }
+
+    public FailedExecutionRepository(DataSource dataSource, String scheduledTable, Dialect dialect,
+            DiagnosticSanitizer sanitizer) {
+        this.sanitizer = sanitizer;
         this.jdbc = new JdbcTemplate(dataSource);
         this.transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         this.scheduledTable = ExecutionRepository.validateTableName(scheduledTable);
@@ -50,24 +54,30 @@ public class FailedExecutionRepository {
     }
 
     public Page<ExecutionRow> page(ExecutionFilter filter) {
-        if (!tableExists() || (filter.state() != null && filter.state() != ExecutionState.FAILED)) {
-            return new Page<>(List.of(), filter.page(), filter.pageSize(), 0);
-        }
-        StringBuilder where = new StringBuilder(" WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-        applyFilter(filter, where, params);
+        Keyset.size(filter.pageSize());
+        if (filter.state() != null && filter.state() != ExecutionState.FAILED)
+            return new Page<>(List.of(), null, null);
+        ExecutionFilter failed = new ExecutionFilter(ExecutionState.FAILED, filter.taskName(),
+                filter.instanceContains(), filter.from(), filter.to(), filter.cursor(),
+                filter.pageSize(), filter.sort(), filter.descending());
+        return new ExecutionRepository(jdbc.getDataSource(), scheduledTable, dialect)
+                .page(failed, Instant.now(), tableExists());
+    }
 
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + TABLE + where, Long.class, params.toArray());
-        String orderBy = " ORDER BY " + failedSortColumn(filter.sort())
-                + (filter.descending() ? " DESC" : " ASC") + ", task_name, task_instance";
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE + where + orderBy
-                + dialect.paginationClause();
-        List<Object> pageParams = new ArrayList<>(params);
-        pageParams.addAll(Arrays.asList(dialect.paginationParams(
-                filter.page() * filter.pageSize(), filter.pageSize())));
-        return new Page<>(jdbc.query(sql, this::mapRow, pageParams.toArray()),
-                filter.page(), filter.pageSize(), total == null ? 0 : total);
+    public byte[] payload(String task, String id, int maxBytes) {
+        if (!tableExists()) return null;
+        return jdbc.query("SELECT task_data FROM " + TABLE + " WHERE task_name = ? AND task_instance = ?", rs -> {
+            if (!rs.next()) return null;
+            try (var in = rs.getBinaryStream(1)) {
+                return in == null ? null : in.readNBytes(maxBytes + 1);
+            } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+        }, task, id);
+    }
+
+    public Optional<ExecutionRow> metadata(String task, String id) {
+        if (!tableExists()) return Optional.empty();
+        return jdbc.query("SELECT " + COLUMNS.replace("task_data,", "NULL AS task_data,") + " FROM " + TABLE
+                + " WHERE task_name = ? AND task_instance = ?", this::mapRow, task, id).stream().findFirst();
     }
 
     public Optional<ExecutionRow> find(String taskName, String instanceId) {
@@ -109,8 +119,8 @@ public class FailedExecutionRepository {
                     truncate(taskDataType, 512), execution.consecutiveFailures + 1,
                     dialect.jdbcTimestamp(complete.getTimeDone()),
                     cause == null ? null : truncate(cause.getClass().getName(), 512),
-                    cause == null ? null : truncate(cause.getMessage(), MAX_MESSAGE),
-                    cause == null ? null : truncate(Stacktraces.render(cause), MAX_STACKTRACE),
+                    cause == null ? null : truncate(DiagnosticSanitizer.apply(sanitizer, cause.getMessage()), MAX_MESSAGE),
+                    cause == null ? null : truncate(DiagnosticSanitizer.apply(sanitizer, Stacktraces.render(cause)), MAX_STACKTRACE),
                     execution.getTaskName(), execution.getId(), execution.version, true);
             if (inserted != 1) {
                 throw new ConcurrencyFailureException(
@@ -163,33 +173,6 @@ public class FailedExecutionRepository {
         return deleted != null && deleted == 1;
     }
 
-    private void applyFilter(ExecutionFilter filter, StringBuilder where, List<Object> params) {
-        if (filter.taskName() != null && !filter.taskName().isBlank()) {
-            where.append(" AND task_name = ?");
-            params.add(filter.taskName());
-        }
-        if (filter.instanceContains() != null && !filter.instanceContains().isBlank()) {
-            where.append(" AND LOWER(task_instance) LIKE ?");
-            params.add("%" + filter.instanceContains().toLowerCase(Locale.ROOT) + "%");
-        }
-        if (filter.from() != null) {
-            where.append(" AND failed_at >= ?");
-            params.add(dialect.jdbcTimestamp(filter.from()));
-        }
-        if (filter.to() != null) {
-            where.append(" AND failed_at <= ?");
-            params.add(dialect.jdbcTimestamp(filter.to()));
-        }
-    }
-
-    private static String failedSortColumn(SortColumn sort) {
-        return switch (sort) {
-            case EXECUTION_TIME, LAST_HEARTBEAT -> "failed_at";
-            case TASK_NAME -> "task_name";
-            case CONSECUTIVE_FAILURES -> "failure_count";
-        };
-    }
-
     private static String truncate(String value, int max) {
         return value == null || value.length() <= max ? value : value.substring(0, max);
     }
@@ -211,8 +194,8 @@ public class FailedExecutionRepository {
                 true,
                 rs.getString("task_data_type"),
                 rs.getString("exception_class"),
-                rs.getString("exception_message"),
-                rs.getString("stacktrace"));
+                DiagnosticSanitizer.apply(sanitizer, rs.getString("exception_message")),
+                DiagnosticSanitizer.apply(sanitizer, rs.getString("stacktrace")));
     }
 
     private Instant instant(ResultSet rs, String column) throws SQLException {

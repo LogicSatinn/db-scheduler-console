@@ -13,7 +13,7 @@ public class PageCtxFactory {
 
     public PageCtx page(String active, HttpServletRequest request) {
         return new PageCtx(
-                props.getBasePath(),
+                (request == null ? "" : request.getContextPath()) + props.getBasePath(),
                 props.isReadOnly(),
                 Math.max(1, props.getPollingInterval().toSeconds()),
                 CsrfSupport.headerJson(request),

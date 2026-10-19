@@ -8,10 +8,10 @@ public record HistoryFilter(
         String textSearch,
         Instant from,
         Instant to,
-        int page,
+        String cursor,
         int pageSize) {
 
-    public static HistoryFilter none(int page, int pageSize) {
-        return new HistoryFilter(null, null, null, null, null, page, pageSize);
+    public static HistoryFilter none(String cursor, int pageSize) {
+        return new HistoryFilter(null, null, null, null, null, cursor, pageSize);
     }
 }

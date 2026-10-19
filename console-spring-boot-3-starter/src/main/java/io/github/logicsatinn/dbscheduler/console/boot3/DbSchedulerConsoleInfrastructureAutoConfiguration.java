@@ -1,5 +1,6 @@
 package io.github.logicsatinn.dbscheduler.console.boot3;
 
+import io.github.logicsatinn.dbscheduler.console.data.DiagnosticSanitizer;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerCustomizer;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
@@ -71,15 +72,19 @@ public class DbSchedulerConsoleInfrastructureAutoConfiguration {
 
     @Bean
     HistoryRepository dbSchedulerConsoleHistoryRepository(DataSource dataSource,
-            ConsoleAvailability availability) {
-        return new HistoryRepository(dataSource, availability.dialectOrFallback());
+            ConsoleAvailability availability,
+            ObjectProvider<DiagnosticSanitizer> sanitizer) {
+        return new HistoryRepository(dataSource, availability.dialectOrFallback(),
+                sanitizer.getIfAvailable(() -> DiagnosticSanitizer.IDENTITY));
     }
 
     @Bean
     FailedExecutionRepository dbSchedulerConsoleFailedExecutionRepository(DataSource dataSource,
-            ExecutionRepository executions, ConsoleAvailability availability) {
+            ExecutionRepository executions, ConsoleAvailability availability,
+            ObjectProvider<DiagnosticSanitizer> sanitizer) {
         return new FailedExecutionRepository(dataSource, executions.tableName(),
-                availability.dialectOrFallback());
+                availability.dialectOrFallback(),
+                sanitizer.getIfAvailable(() -> DiagnosticSanitizer.IDENTITY));
     }
 
     @Bean

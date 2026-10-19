@@ -2,6 +2,8 @@ package io.github.logicsatinn.dbscheduler.console.data.history;
 
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.Page;
+import io.github.logicsatinn.dbscheduler.console.data.Keyset;
+import io.github.logicsatinn.dbscheduler.console.data.DiagnosticSanitizer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -33,12 +35,18 @@ public class HistoryRepository {
             "id, task_name, task_instance, outcome, started_at, finished_at, duration_ms, "
             + "exception_class, exception_message, stacktrace, picked_by";
 
+    private final DiagnosticSanitizer sanitizer;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final Dialect dialect;
     private volatile Schema detectedSchema;
 
     public HistoryRepository(DataSource dataSource, Dialect dialect) {
+        this(dataSource, dialect, DiagnosticSanitizer.IDENTITY);
+    }
+
+    public HistoryRepository(DataSource dataSource, Dialect dialect, DiagnosticSanitizer sanitizer) {
+        this.sanitizer = sanitizer;
         this.jdbc = new JdbcTemplate(dataSource);
         this.transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         this.dialect = dialect;
@@ -93,8 +101,8 @@ public class HistoryRepository {
                 dialect.jdbcTimestamp(e.startedAt()), dialect.jdbcTimestamp(e.finishedAt()),
                 e.durationMs()));
         params.add(truncate(e.exceptionClass(), 512));
-        params.add(truncate(e.exceptionMessage(), MAX_MESSAGE));
-        params.add(truncate(e.stacktrace(), MAX_STACKTRACE));
+        params.add(truncate(DiagnosticSanitizer.apply(sanitizer, e.exceptionMessage()), MAX_MESSAGE));
+        params.add(truncate(DiagnosticSanitizer.apply(sanitizer, e.stacktrace()), MAX_STACKTRACE));
         params.add(e.pickedBy());
         if (schema == Schema.CURRENT) {
             params.add(e.taskData());
@@ -136,17 +144,32 @@ public class HistoryRepository {
             params.add(dialect.jdbcTimestamp(f.to()));
         }
 
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + TABLE + where, Long.class, params.toArray());
-
+        int size = Keyset.size(f.pageSize());
+        String scope = Keyset.scope("history", f.taskName(), f.outcome(), f.textSearch(), f.from(), f.to(), size);
+        Keyset.Cursor cursor = Keyset.decode(f.cursor(), scope, 2);
+        boolean backwards = cursor != null && cursor.backwards();
+        var keys = List.of(new Keyset.Key("started_at", cursor == null ? null
+                        : Keyset.value(cursor.values().get(0), Instant.class), true),
+                new Keyset.Key("id", cursor == null ? null : Keyset.value(cursor.values().get(1), Long.class), true));
+        if (cursor != null && (keys.get(0).value() == null || keys.get(1).value() == null
+                || (Long) keys.get(1).value() < 1)) throw new IllegalArgumentException("Invalid history cursor");
+        if (cursor != null) Keyset.seek(where, params, keys, backwards, dialect);
         String sql = "SELECT " + columns() + " FROM " + TABLE + where
-                + " ORDER BY started_at DESC, id DESC" + dialect.paginationClause();
-        List<Object> pageParams = new ArrayList<>(params);
-        pageParams.addAll(Arrays.asList(
-                dialect.paginationParams(f.page() * f.pageSize(), f.pageSize())));
+                + Keyset.order(keys, backwards) + dialect.paginationClause();
+        params.addAll(Arrays.asList(dialect.paginationParams(0, size + 1)));
+        List<HistoryEntry> rows = jdbc.query(sql, this::mapRow, params.toArray());
+        return Keyset.page(rows, size, cursor, scope, row -> List.of(
+                new Keyset.Key("started_at", row.startedAt(), true), new Keyset.Key("id", row.id(), true)));
+    }
 
-        List<HistoryEntry> rows = jdbc.query(sql, this::mapRow, pageParams.toArray());
-        return new Page<>(rows, f.page(), f.pageSize(), total == null ? 0 : total);
+    public byte[] payload(long id, int maxBytes) {
+        if (schema() != Schema.CURRENT) return null;
+        return jdbc.query("SELECT task_data FROM " + TABLE + " WHERE id = ?", rs -> {
+            if (!rs.next()) return null;
+            try (var in = rs.getBinaryStream(1)) {
+                return in == null ? null : in.readNBytes(maxBytes + 1);
+            } catch (IOException e) { throw new UncheckedIOException(e); }
+        }, id);
     }
 
     public List<HistoryEntry> forInstance(String taskName, String instanceId, int limit) {
@@ -181,7 +204,7 @@ public class HistoryRepository {
         String metadata = Arrays.stream(METADATA_COLUMNS.split(", ")).map(c -> "h." + c)
                 .collect(Collectors.joining(", "));
         return schema() == Schema.CURRENT
-                ? metadata + ", h.task_data, h.task_data_type"
+                ? metadata + ", NULL AS task_data, h.task_data_type"
                 : metadata + ", NULL AS task_data, NULL AS task_data_type";
     }
 
@@ -247,7 +270,7 @@ public class HistoryRepository {
 
     private String columns() {
         return schema() == Schema.CURRENT
-                ? METADATA_COLUMNS + ", task_data, task_data_type"
+                ? METADATA_COLUMNS + ", NULL AS task_data, task_data_type"
                 : METADATA_COLUMNS + ", NULL AS task_data, NULL AS task_data_type";
     }
 
@@ -261,8 +284,8 @@ public class HistoryRepository {
                 instant(rs, "finished_at"),
                 rs.getLong("duration_ms"),
                 rs.getString("exception_class"),
-                rs.getString("exception_message"),
-                rs.getString("stacktrace"),
+                DiagnosticSanitizer.apply(sanitizer, rs.getString("exception_message")),
+                DiagnosticSanitizer.apply(sanitizer, rs.getString("stacktrace")),
                 rs.getString("picked_by"),
                 rs.getBytes("task_data"),
                 rs.getString("task_data_type"));

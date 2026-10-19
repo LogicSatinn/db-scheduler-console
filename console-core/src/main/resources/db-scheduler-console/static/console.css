@@ -106,3 +106,7 @@ details.stack pre {
 }
 pre.data { background: var(--page); border: 1px solid var(--grid); border-radius: 6px; padding: 10px; overflow-x: auto; }
 .empty { color: var(--muted); padding: 24px; text-align: center; }
+
+.inline-form { display: inline; }
+.htmx-indicator { opacity: 0; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }

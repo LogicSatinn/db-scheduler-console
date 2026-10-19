@@ -54,8 +54,7 @@ class ExecutionRepositoryTest {
                 java.util.Map.entry(ExecutionState.DUE, "2"),
                 java.util.Map.entry(ExecutionState.RUNNING, "3"),
                 java.util.Map.entry(ExecutionState.RETRYING, "4"))) {
-            var filter = new ExecutionFilter(expected.getKey(), null, null, null, null,
-                    0, 10, SortColumn.EXECUTION_TIME, false);
+            var filter = new ExecutionFilter(expected.getKey(), null, null, null, null, null, 10, SortColumn.EXECUTION_TIME, false);
             Page<ExecutionRow> page = repo.page(filter, NOW);
             assertThat(page.items()).extracting(ExecutionRow::instanceId)
                     .as("state %s", expected.getKey())
@@ -69,18 +68,15 @@ class ExecutionRepositoryTest {
         insert("email-send", "order-200", NOW.plus(20, ChronoUnit.MINUTES), false, null, 0);
         insert("report-gen", "order-100", NOW.plus(30, ChronoUnit.MINUTES), false, null, 0);
 
-        var byTask = repo.page(new ExecutionFilter(null, "email-send", null, null, null,
-                0, 10, SortColumn.EXECUTION_TIME, false), NOW);
-        assertThat(byTask.total()).isEqualTo(2);
+        var byTask = repo.page(new ExecutionFilter(null, "email-send", null, null, null, null, 10, SortColumn.EXECUTION_TIME, false), NOW);
+        assertThat(byTask.items().size()).isEqualTo(2);
 
-        var bySearch = repo.page(new ExecutionFilter(null, null, "ORDER-1", null, null,
-                0, 10, SortColumn.EXECUTION_TIME, false), NOW);
+        var bySearch = repo.page(new ExecutionFilter(null, null, "ORDER-1", null, null, null, 10, SortColumn.EXECUTION_TIME, false), NOW);
         assertThat(bySearch.items()).extracting(ExecutionRow::taskName)
                 .containsExactlyInAnyOrder("email-send", "report-gen");
 
         var byRange = repo.page(new ExecutionFilter(null, null, null,
-                NOW.plus(15, ChronoUnit.MINUTES), NOW.plus(25, ChronoUnit.MINUTES),
-                0, 10, SortColumn.EXECUTION_TIME, false), NOW);
+                NOW.plus(15, ChronoUnit.MINUTES), NOW.plus(25, ChronoUnit.MINUTES), null, 10, SortColumn.EXECUTION_TIME, false), NOW);
         assertThat(byRange.items()).extracting(ExecutionRow::instanceId).containsExactly("order-200");
     }
 
@@ -89,16 +85,18 @@ class ExecutionRepositoryTest {
         for (int i = 0; i < 25; i++) {
             insert("bulk", "i-%02d".formatted(i), NOW.plus(i, ChronoUnit.MINUTES), false, null, 0);
         }
-        var page0 = repo.page(ExecutionFilter.none(0, 10), NOW);
-        var page2 = repo.page(ExecutionFilter.none(2, 10), NOW);
-        assertThat(page0.total()).isEqualTo(25);
-        assertThat(page0.totalPages()).isEqualTo(3);
+        var page0 = repo.page(ExecutionFilter.none(null, 10), NOW);
+        var page1 = repo.page(ExecutionFilter.none(page0.nextCursor(), 10), NOW);
+        var page2 = repo.page(ExecutionFilter.none(page1.nextCursor(), 10), NOW);
+        var previous = repo.page(ExecutionFilter.none(page2.previousCursor(), 10), NOW);
+        assertThat(previous.items()).isEqualTo(page1.items());
+        assertThat(page2.nextCursor()).isNull();
+        assertThat(page0.nextCursor()).isNotNull();
         assertThat(page0.items()).hasSize(10);
         assertThat(page2.items()).hasSize(5);
         assertThat(page0.items().get(0).instanceId()).isEqualTo("i-00");
 
-        var desc = repo.page(new ExecutionFilter(null, null, null, null, null,
-                0, 10, SortColumn.EXECUTION_TIME, true), NOW);
+        var desc = repo.page(new ExecutionFilter(null, null, null, null, null, null, 10, SortColumn.EXECUTION_TIME, true), NOW);
         assertThat(desc.items().get(0).instanceId()).isEqualTo("i-24");
     }
 

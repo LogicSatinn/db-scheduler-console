@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionOperations;
 
 public class ExecutionActions {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ExecutionActions.class);
     private final SchedulerClient client;
     private final Clock clock;
     private final FailedExecutionRepository failedExecutions;
@@ -59,7 +60,7 @@ public class ExecutionActions {
 
         public static InstanceRef parse(String composite) {
             int i = composite.indexOf(SEP);
-            if (i < 0) {
+            if (i <= 0 || i + SEP.length() >= composite.length()) {
                 throw new IllegalArgumentException("Malformed instance ref");
             }
             return new InstanceRef(composite.substring(0, i), composite.substring(i + SEP.length()));
@@ -88,8 +89,10 @@ public class ExecutionActions {
                     ? new ActionResult(true, verb + " succeeded for " + instanceId)
                     : new ActionResult(false, verb + " failed for " + instanceId
                             + " — it is executing right now, was changed concurrently, or no longer exists");
+        } catch (com.github.kagkarlsson.scheduler.exceptions.TaskInstanceNotFoundException e) {
+            return new ActionResult(false, "Execution no longer exists");
         } catch (RuntimeException e) {
-            return new ActionResult(false, verb + " failed for " + instanceId + ": " + e.getMessage());
+            return unexpected(verb, e);
         }
     }
 
@@ -105,9 +108,10 @@ public class ExecutionActions {
             transactions.executeWithoutResult(status ->
                     client.cancel(TaskInstanceId.of(taskName, instanceId)));
             return new ActionResult(true, "Deleted " + instanceId);
+        } catch (com.github.kagkarlsson.scheduler.exceptions.TaskInstanceNotFoundException e) {
+            return new ActionResult(false, "Execution no longer exists");
         } catch (RuntimeException e) {
-            return new ActionResult(false, "Delete failed for " + instanceId
-                    + " — it is executing right now or no longer exists");
+            return unexpected("Delete", e);
         }
     }
 
@@ -118,6 +122,11 @@ public class ExecutionActions {
                     + ": no registered task named " + failed.taskName());
         }
         try {
+            if (failed.taskData() != null && failed.taskData().length > FilteringJavaSerializer.MAX_INPUT_BYTES)
+                return new ActionResult(false, "Requeue rejected: payload exceeds input limit");
+            if (failed.taskData() != null && serializer.getClass() == com.github.kagkarlsson.scheduler.serializer.JavaSerializer.class
+                    && java.io.ObjectInputFilter.Config.getSerialFilter() == null)
+                return new ActionResult(false, "Requeue requires a host-configured Java deserialization filter");
             serializer.deserialize(task.getDataClass(), failed.taskData());
             boolean requeued = failedExecutions.requeue(failed, clock.instant());
             return requeued
@@ -125,9 +134,15 @@ public class ExecutionActions {
                     : new ActionResult(false, "Requeue failed for " + failed.instanceId()
                             + " — it was changed concurrently or no longer exists");
         } catch (RuntimeException e) {
-            return new ActionResult(false, "Requeue failed for " + failed.instanceId()
-                    + ": " + e.getMessage());
+            return unexpected("Requeue", e);
         }
+    }
+
+    private static ActionResult unexpected(String operation, RuntimeException error) {
+        String reference = java.util.UUID.randomUUID().toString();
+        LOG.warn("Console action failed: operation={}, reference={}, exceptionType={}",
+                operation, reference, error.getClass().getName());
+        return new ActionResult(false, operation + " failed. Reference: " + reference);
     }
 
     public ActionResult bulk(Kind kind, List<InstanceRef> refs) {

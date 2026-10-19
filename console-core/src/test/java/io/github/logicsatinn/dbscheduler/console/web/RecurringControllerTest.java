@@ -53,14 +53,14 @@ class RecurringControllerTest {
 
     @Test
     void listsKnownTasks() throws Exception {
-        var doc = page(new ConsoleProperties());
+        var doc = page(writable());
         assertThat(doc.select("table.data tbody tr")).hasSize(3);
         assertThat(doc.select("tbody").text()).contains("cleanup").contains("Recurring");
     }
 
     @Test
     void historyLinkIsUrlEncoded() throws Exception {
-        var doc = page(new ConsoleProperties());
+        var doc = page(writable());
         assertThat(doc.select("tbody a").eachAttr("href"))
                 .contains("/db-scheduler-console/history?task=purge%26sweep%20old");
     }
@@ -69,7 +69,7 @@ class RecurringControllerTest {
     void waitingRecurringTaskOffersRunNowForItsRecurringInstance() throws Exception {
         schedule("cleanup", false);
 
-        Element form = row(page(new ConsoleProperties()), "cleanup").selectFirst("form");
+        Element form = row(page(writable()), "cleanup").selectFirst("form");
 
         assertThat(form).isNotNull();
         assertThat(form.attr("hx-post")).isEqualTo("/db-scheduler-console/actions/run-now");
@@ -83,7 +83,7 @@ class RecurringControllerTest {
     void noRunNowWhileRunningWithoutALiveRowOrForOneTimeDefinitions() throws Exception {
         schedule("purge&sweep old", true);
 
-        var doc = page(new ConsoleProperties());
+        var doc = page(writable());
 
         assertThat(row(doc, "purge&sweep old").select("form")).as("running").isEmpty();
         assertThat(row(doc, "cleanup").select("form")).as("no live row").isEmpty();
@@ -94,7 +94,7 @@ class RecurringControllerTest {
     void runNowFlashIsNotFilteredByTheRefreshRegion() throws Exception {
         schedule("cleanup", false);
 
-        HtmxAssertions.actionFormsDoNotInheritRegionSelect(page(new ConsoleProperties()));
+        HtmxAssertions.actionFormsDoNotInheritRegionSelect(page(writable()));
     }
 
     @Test
@@ -118,6 +118,12 @@ class RecurringControllerTest {
         assertThat(region.attr("hx-trigger")).isEqualTo("every 1s, dsc-refresh from:body");
         assertThat(region.attr("hx-select")).isEqualTo("#recurring-region");
         assertThat(region.select("table.data")).hasSize(1);
+    }
+
+    private static ConsoleProperties writable() {
+        var props = new ConsoleProperties();
+        props.setReadOnly(false);
+        return props;
     }
 
     private void schedule(String task, boolean picked) {

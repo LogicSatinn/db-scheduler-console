@@ -1,5 +1,6 @@
 package io.github.logicsatinn.dbscheduler.console.web;
 
+import io.github.logicsatinn.dbscheduler.console.data.Keyset;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionState;
 import io.github.logicsatinn.dbscheduler.console.data.SortColumn;
@@ -56,19 +57,21 @@ public class ExecutionsController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(defaultValue = "EXECUTION_TIME") String sort,
             @RequestParam(defaultValue = "asc") String dir,
             HttpServletRequest request) {
         Instant now = clock.instant();
         SortColumn sortColumn = parseEnum(SortColumn.class, sort, SortColumn.EXECUTION_TIME);
+        if (!"asc".equalsIgnoreCase(dir) && !"desc".equalsIgnoreCase(dir))
+            throw new IllegalArgumentException("Invalid sort direction");
         boolean desc = "desc".equalsIgnoreCase(dir);
         var filter = new ExecutionFilter(
                 parseEnum(ExecutionState.class, state, null),
                 blankToNull(task), blankToNull(q),
                 parseLocal(from), parseLocal(to),
-                Math.max(0, page), clamp(size, 1, 200), sortColumn, desc);
+                cursor, Keyset.size(size), sortColumn, desc);
 
         Map<String, Object> model = new HashMap<>();
         model.put("ctx", ctxFactory.page("executions", request));
@@ -82,7 +85,7 @@ public class ExecutionsController {
         model.put("queryBase", queryBase(state, task, q, from, to, size));
         model.put("refreshUrl", request.getRequestURI() + queryBase(state, task, q, from, to, size)
                 + "&sort=" + sortColumn.name() + "&dir=" + (desc ? "desc" : "asc")
-                + "&page=" + Math.max(0, page));
+                + (cursor == null ? "" : "&cursor=" + Fmt.url(cursor)));
         return templates.page("pages/executions.jte", model);
     }
 
@@ -105,11 +108,17 @@ public class ExecutionsController {
         model.put("ctx", ctxFactory.page("executions", request));
         model.put("row", row.get());
         model.put("now", clock.instant());
-        model.put("dataPreview", taskData.render(row.get().taskData()));
+        model.put("payloadVisible", taskData.visible());
         model.put("historyEntries", historyEntries);
         model.put("selfUrl", ctxFactory.page("executions", request).basePath()
                 + "/execution?task=" + Fmt.url(task) + "&id=" + Fmt.url(id));
         return templates.page("pages/executionDetail.jte", model);
+    }
+
+    @GetMapping(value = "/payload/execution", produces = "text/plain;charset=UTF-8")
+    public ResponseEntity<String> payload(@RequestParam String task, @RequestParam String id) {
+        if (!taskData.visible()) return ResponseEntity.status(403).body("Payloads are hidden");
+        return ResponseEntity.ok(taskData.render(executions.payload(task, id, TaskDataRenderer.MAX_BYTES)));
     }
 
     private static String queryBase(String state, String task, String q, String from, String to, int size) {
@@ -136,7 +145,7 @@ public class ExecutionsController {
         try {
             return Enum.valueOf(type, value.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            return fallback;
+            throw new IllegalArgumentException("Invalid filter value");
         }
     }
 
@@ -147,7 +156,7 @@ public class ExecutionsController {
         try {
             return LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant();
         } catch (DateTimeParseException e) {
-            return null;
+            throw new IllegalArgumentException("Invalid date/time");
         }
     }
 
@@ -155,7 +164,4 @@ public class ExecutionsController {
         return s == null || s.isBlank() ? null : s;
     }
 
-    private static int clamp(int v, int min, int max) {
-        return Math.min(max, Math.max(min, v));
-    }
 }

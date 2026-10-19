@@ -8,10 +8,17 @@ public class ConsoleProperties {
 
     private boolean enabled = true;
     private String basePath = "/db-scheduler-console";
-    private boolean readOnly = false;
+    private boolean readOnly = true;
+    private boolean allowFraming = false;
+    private String externalOrigin;
     private Duration pollingInterval = Duration.ofSeconds(5);
     private final History history = new History();
     private final TaskData taskData = new TaskData();
+
+    public boolean isAllowFraming() { return allowFraming; }
+    public void setAllowFraming(boolean value) { allowFraming = value; }
+    public String getExternalOrigin() { return externalOrigin; }
+    public void setExternalOrigin(String value) { externalOrigin = value; }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -26,7 +33,7 @@ public class ConsoleProperties {
 
     public static class History {
         private boolean enabled = true;
-        private boolean storeTaskData = true;
+        private boolean storeTaskData = false;
         private Duration retention = Duration.ofDays(14);
 
         public boolean isEnabled() { return enabled; }
@@ -38,7 +45,7 @@ public class ConsoleProperties {
     }
 
     public static class TaskData {
-        private boolean visible = true;
+        private boolean visible = false;
 
         public boolean isVisible() { return visible; }
         public void setVisible(boolean visible) { this.visible = visible; }
