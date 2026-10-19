@@ -32,7 +32,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
-/** Infrastructure that must exist before db-scheduler assembles tasks and listeners. */
 @AutoConfiguration(
         afterName = "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
         beforeName = "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration")

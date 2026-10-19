@@ -57,7 +57,6 @@ class HistoryRepositoryTest {
 
         Page<HistoryEntry> all = repo.page(new HistoryFilter(null, null, null, null, null, 0, 10));
         assertThat(all.total()).isEqualTo(3);
-        // newest first
         assertThat(all.items().get(0).instanceId()).isEqualTo("3");
 
         Page<HistoryEntry> failed = repo.page(new HistoryFilter(null, HistoryEntry.Outcome.FAILED, null, null, null, 0, 10));

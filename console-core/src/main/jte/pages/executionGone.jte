@@ -4,7 +4,6 @@
 @param java.util.List<io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry> historyEntries
 @template.layout(ctx = ctx, title = taskName + " / " + instanceId, content = @`
     <h1>${taskName} <span class="muted">/</span> ${instanceId}</h1>
-    <%-- Same id as the live detail region so a polling detail page swaps this in; no hx-trigger, so polling stops. --%>
     <div id="detail-live">
     @if(historyEntries.isEmpty())
         <div class="card">

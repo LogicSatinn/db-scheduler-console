@@ -19,7 +19,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
-/** Contract every dialect must satisfy. Subclasses supply a live container. */
 public abstract class RepositoryContractTest {
 
     static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
@@ -40,7 +39,6 @@ public abstract class RepositoryContractTest {
         populator.execute(ds);
     }
 
-    /** Verifies the supported M1 upgrade before recreating the schema as a fresh M2 install. */
     static void prepareSchema(DataSource ds, Dialect dialect, String schedulerSchema) {
         applyScripts(ds, schedulerSchema,
                 dialect.migrationResource().replace("/migrations/", "/m1/"));

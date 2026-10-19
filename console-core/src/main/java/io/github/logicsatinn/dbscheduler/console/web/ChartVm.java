@@ -6,7 +6,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Precomputed SVG geometry for the 24h throughput chart (viewBox 0 0 720 170). */
 public final class ChartVm {
 
     static final double PLOT_LEFT = 30;

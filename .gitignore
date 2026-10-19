@@ -4,7 +4,6 @@ build/
 *.iml
 .DS_Store
 
-### Other files ###
 .claude
 .codex
 AGENTS.md

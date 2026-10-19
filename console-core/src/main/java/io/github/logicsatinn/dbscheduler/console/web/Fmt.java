@@ -18,12 +18,6 @@ public final class Fmt {
         return i == null ? "—" : TS.format(i);
     }
 
-    /**
-     * Encodes a task or instance identifier for use as a query-string value. HTML-escaping,
-     * which JTE applies, is not URL-component encoding: an id like {@code order+A&B} would
-     * otherwise split the link into extra parameters. Spaces become {@code %20} rather than
-     * URLEncoder's form-encoded {@code +}, which is ambiguous in a query string.
-     */
     public static String url(String value) {
         return value == null ? ""
                 : URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");

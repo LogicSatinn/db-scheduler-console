@@ -56,7 +56,7 @@ class StatsServiceTest {
                 + " values ('a','2', ?, true, 'n1', 1)", Timestamp.from(NOW));
         history.insert(at(NOW.minusSeconds(60), HistoryEntry.Outcome.SUCCEEDED));
         history.insert(at(NOW.minusSeconds(120), HistoryEntry.Outcome.FAILED));
-        history.insert(at(NOW.minus(3, ChronoUnit.DAYS), HistoryEntry.Outcome.FAILED)); // outside 24h
+        history.insert(at(NOW.minus(3, ChronoUnit.DAYS), HistoryEntry.Outcome.FAILED));
 
         var tiles = stats.tiles();
         assertThat(tiles.scheduled()).isEqualTo(1);
@@ -67,18 +67,17 @@ class StatsServiceTest {
 
     @Test
     void throughputBucketsAreHourAlignedOldestFirst() {
-        // NOW is 12:30 → window is [13:00 yesterday, 13:00 today), buckets aligned to hours
-        history.insert(at(NOW.minusSeconds(300), HistoryEntry.Outcome.SUCCEEDED)); // 12:25 → last bucket
+        history.insert(at(NOW.minusSeconds(300), HistoryEntry.Outcome.SUCCEEDED));
         history.insert(at(NOW.minusSeconds(300), HistoryEntry.Outcome.FAILED));
         history.insert(at(NOW.minus(5, ChronoUnit.HOURS), HistoryEntry.Outcome.SUCCEEDED));
-        history.insert(at(NOW.minus(30, ChronoUnit.HOURS), HistoryEntry.Outcome.SUCCEEDED)); // outside
+        history.insert(at(NOW.minus(30, ChronoUnit.HOURS), HistoryEntry.Outcome.SUCCEEDED));
 
         var buckets = stats.throughputLast24h();
         assertThat(buckets).hasSize(24);
         assertThat(buckets.get(23).hourStart()).isEqualTo(Instant.parse("2026-07-13T12:00:00Z"));
         assertThat(buckets.get(23).succeeded()).isEqualTo(1);
         assertThat(buckets.get(23).failed()).isEqualTo(1);
-        assertThat(buckets.get(18).succeeded()).isEqualTo(1); // 07:00–08:00 bucket
+        assertThat(buckets.get(18).succeeded()).isEqualTo(1);
         long totalCounted = buckets.stream().mapToLong(b -> b.succeeded() + b.failed()).sum();
         assertThat(totalCounted).isEqualTo(3);
     }

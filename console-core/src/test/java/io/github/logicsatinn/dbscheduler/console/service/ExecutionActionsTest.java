@@ -97,13 +97,12 @@ class ExecutionActionsTest {
                 new ExecutionActions.InstanceRef("action-task", "a"),
                 new ExecutionActions.InstanceRef("action-task", "b"),
                 new ExecutionActions.InstanceRef("action-task", "missing")));
-        assertThat(result.success()).isFalse(); // at least one failure
+        assertThat(result.success()).isFalse();
         assertThat(result.message()).contains("2 succeeded").contains("1 failed");
     }
 
     @Test
     void actionsCommitWhenConnectionsDisableAutoCommit() {
-        // Wired the way db-scheduler's Spring Boot starter builds its client.
         DataSource nonAutoCommit = new NonAutoCommitDataSource(ds);
         SchedulerClient bootClient = SchedulerClient.Builder.create(
                 new TransactionAwareDataSourceProxy(nonAutoCommit), TASK).build();

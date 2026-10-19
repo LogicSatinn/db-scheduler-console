@@ -81,7 +81,7 @@ class DbSchedulerConsoleAutoConfigurationTest {
         runner.withPropertyValues("db-scheduler-console.history.enabled=false").run(ctx -> {
             assertThat(ctx).doesNotHaveBean(ConsoleSchedulerListener.class);
             assertThat(ctx.getBeansOfType(RecurringTask.class)).isEmpty();
-            assertThat(ctx).hasSingleBean(OverviewController.class); // live views still on
+            assertThat(ctx).hasSingleBean(OverviewController.class);
         });
     }
 
@@ -199,7 +199,6 @@ class DbSchedulerConsoleAutoConfigurationTest {
         }
     }
 
-    /** An app that builds its own Scheduler without the db-scheduler Boot starter. */
     @Configuration(proxyBeanMethods = false)
     static class OwnSchedulerConfig {
         @Bean

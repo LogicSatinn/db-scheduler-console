@@ -67,7 +67,6 @@ public class HistoryController {
             try {
                 parsedOutcome = HistoryEntry.Outcome.valueOf(outcome.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ignored) {
-                // unknown value = no outcome filter
             }
         }
         var filter = new HistoryFilter(

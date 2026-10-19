@@ -14,10 +14,6 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Records finished executions into dsc_execution_history.
- * MUST never propagate exceptions — a history failure must not affect task execution.
- */
 public class ConsoleSchedulerListener extends AbstractSchedulerListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConsoleSchedulerListener.class);

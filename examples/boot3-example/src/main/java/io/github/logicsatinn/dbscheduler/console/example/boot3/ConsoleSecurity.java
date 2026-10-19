@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
-/** Host-owned example security. The console starter deliberately provides none. */
 @Configuration(proxyBeanMethods = false)
 class ConsoleSecurity {
 

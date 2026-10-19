@@ -1,6 +1,5 @@
 package io.github.logicsatinn.dbscheduler.console.data;
 
-/** Whitelisted sortable columns — the enum is the SQL-injection guard. */
 public enum SortColumn {
     EXECUTION_TIME("execution_time"),
     TASK_NAME("task_name"),

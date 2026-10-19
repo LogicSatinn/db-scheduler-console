@@ -44,10 +44,10 @@ class ExecutionRepositoryTest {
 
     @Test
     void filtersByDerivedState() {
-        insert("task-a", "1", NOW.plus(1, ChronoUnit.HOURS), false, null, 0);   // SCHEDULED
-        insert("task-a", "2", NOW.minus(1, ChronoUnit.MINUTES), false, null, 0); // DUE
-        insert("task-b", "3", NOW.minus(1, ChronoUnit.MINUTES), true, "node-1", 0); // RUNNING
-        insert("task-b", "4", NOW.plus(5, ChronoUnit.MINUTES), false, null, 3);  // FAILING
+        insert("task-a", "1", NOW.plus(1, ChronoUnit.HOURS), false, null, 0);
+        insert("task-a", "2", NOW.minus(1, ChronoUnit.MINUTES), false, null, 0);
+        insert("task-b", "3", NOW.minus(1, ChronoUnit.MINUTES), true, "node-1", 0);
+        insert("task-b", "4", NOW.plus(5, ChronoUnit.MINUTES), false, null, 3);
 
         for (var expected : List.of(
                 java.util.Map.entry(ExecutionState.SCHEDULED, "1"),
@@ -107,7 +107,7 @@ class ExecutionRepositoryTest {
         insert("task-a", "1", NOW.plus(2, ChronoUnit.HOURS), false, null, 0);
         insert("task-a", "2", NOW.plus(1, ChronoUnit.HOURS), false, null, 0);
         insert("task-b", "3", NOW.plus(30, ChronoUnit.MINUTES), false, null, 0);
-        insert("task-c", "4", NOW.plus(5, ChronoUnit.MINUTES), true, "node-1", 0); // picked
+        insert("task-c", "4", NOW.plus(5, ChronoUnit.MINUTES), true, "node-1", 0);
 
         assertThat(repo.nextExecutionTimes())
                 .containsOnly(

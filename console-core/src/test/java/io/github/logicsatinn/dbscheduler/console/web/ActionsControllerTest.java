@@ -105,6 +105,6 @@ class ActionsControllerTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(body).contains("read-only");
         assertThat(repo.find("action-task", "a").orElseThrow().executionTime())
-                .isEqualTo(NOW.plus(1, ChronoUnit.HOURS)); // unchanged
+                .isEqualTo(NOW.plus(1, ChronoUnit.HOURS));
     }
 }

@@ -6,7 +6,6 @@ import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
 import io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository;
 import javax.sql.DataSource;
 
-/** Terminal failure handler that parks exhausted one-time executions for operator action. */
 public final class FailedExecutionParking {
 
     private final FailedExecutionRepository repository;

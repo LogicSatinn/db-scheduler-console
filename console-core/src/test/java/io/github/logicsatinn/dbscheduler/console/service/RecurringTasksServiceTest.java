@@ -52,7 +52,6 @@ class RecurringTasksServiceTest {
                 new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2), history);
     }
 
-    /** Counts JDBC statements so an N+1 cannot creep back in as tasks are added. */
     static DataSource counting(DataSource delegate, AtomicInteger statements) {
         return (DataSource) Proxy.newProxyInstance(
                 DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
@@ -95,7 +94,6 @@ class RecurringTasksServiceTest {
 
         assertThat(service.rows()).hasSize(10);
 
-        // tableExists + one batched query per repository — never one query per task.
         assertThat(statements.get()).isLessThanOrEqualTo(3);
     }
 
@@ -109,7 +107,6 @@ class RecurringTasksServiceTest {
 
         var rows = service.rows();
         assertThat(rows).hasSize(2);
-        // sorted by name: cleanup, email-send
         assertThat(rows.get(0).taskName()).isEqualTo("cleanup");
         assertThat(rows.get(0).type()).isEqualTo("Recurring");
         assertThat(rows.get(0).nextExecution()).isEqualTo(NOW.plusSeconds(1800));

@@ -85,7 +85,6 @@ class OverviewControllerTest {
         assertThat(doc.select("svg title").eachText())
                 .anyMatch(t -> t.contains("1 succeeded") && t.contains("1 failed"));
         assertThat(doc.select("#recent-failures td").eachText()).anyMatch(t -> t.contains("smtp down"));
-        // polling wired
         assertThat(doc.select("[hx-get$=/fragments/overview-tiles][hx-trigger^=every]")).hasSize(1);
     }
 
@@ -111,9 +110,7 @@ class OverviewControllerTest {
         var model = ChartVm.of(buckets);
         assertThat(model.bars()).hasSize(24);
         var last = model.bars().get(23);
-        // succeeded sits on the baseline (y + height == 140)
         assertThat(last.ySucceeded() + last.heightSucceeded()).isEqualTo(140.0);
-        // failed stacked above with a 2px surface gap
         assertThat(last.yFailed() + last.heightFailed()).isEqualTo(last.ySucceeded() - 2);
         assertThat(model.empty()).isFalse();
 

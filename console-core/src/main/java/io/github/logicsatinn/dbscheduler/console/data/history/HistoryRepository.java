@@ -34,7 +34,6 @@ public class HistoryRepository {
             + "exception_class, exception_message, stacktrace, picked_by";
 
     private final JdbcTemplate jdbc;
-    /** Writes commit explicitly: pools may hand out auto-commit=false connections. */
     private final TransactionTemplate transaction;
     private final Dialect dialect;
     private volatile Schema detectedSchema;
@@ -51,10 +50,6 @@ public class HistoryRepository {
 
     public enum Schema { MISSING, LEGACY, CURRENT }
 
-    /**
-     * M1 tables contain metadata only. M2 tables also contain task_data and task_data_type.
-     * SQL probing is more reliable across the six supported dialects than metadata casing rules.
-     */
     public Schema schema() {
         Schema known = detectedSchema;
         if (known != null) {
@@ -71,7 +66,6 @@ public class HistoryRepository {
                 detectedSchema = Schema.LEGACY;
                 return detectedSchema;
             } catch (DataAccessException tableProbeFailed) {
-                // Do not cache MISSING: migrations may be applied while the app is running.
                 return Schema.MISSING;
             }
         }
@@ -172,11 +166,6 @@ public class HistoryRepository {
         return jdbc.query(sql, this::mapRow, params.toArray()).stream().findFirst();
     }
 
-    /**
-     * Newest entry per task, batched — the recurring page needs one per task. Joining on
-     * MAX(id) is portable across all six dialects; window functions and LIMIT-in-subquery are
-     * not. id is monotonic per insert, so it is also the tiebreak the per-task query uses.
-     */
     public Map<String, HistoryEntry> latestPerTask() {
         String sql = "SELECT " + qualifiedColumns() + " FROM " + TABLE + " h"
                 + " JOIN (SELECT task_name, MAX(id) AS max_id FROM " + TABLE
