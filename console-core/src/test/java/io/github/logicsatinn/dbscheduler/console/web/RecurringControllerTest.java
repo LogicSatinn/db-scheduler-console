@@ -103,7 +103,32 @@ class RecurringControllerTest {
         var props = new ConsoleProperties();
         props.setReadOnly(true);
 
-        assertThat(row(page(props), "cleanup").select("form")).isEmpty();
+        var doc = page(props);
+        assertThat(row(doc, "cleanup").select("form")).isEmpty();
+        assertThat(doc.select("#tasks-bulk-form, input[name=ref]")).isEmpty();
+    }
+
+    @Test
+    void runnableRecurringTasksCanBeRunTogether() throws Exception {
+        schedule("cleanup", false);
+        schedule("purge&sweep old", false);
+
+        var doc = page(writable());
+
+        Element form = doc.getElementById("tasks-bulk-form");
+        assertThat(form).isNotNull();
+        assertThat(form.attr("hx-post")).isEqualTo("/db-scheduler-console/actions/bulk");
+        assertThat(form.attr("hx-target")).isEqualTo("#flash");
+        assertThat(form.select("input[name=kind]").val()).isEqualTo("RUN_NOW");
+        assertThat(form.select("button").text()).isEqualTo("Run selected now");
+        assertThat(doc.select("input[name=ref][form=tasks-bulk-form]").eachAttr("value"))
+                .containsExactly("cleanup::recurring", "purge&sweep old::recurring");
+        assertThat(row(doc, "email").select("input[name=ref]")).as("one-time definition").isEmpty();
+    }
+
+    @Test
+    void noBulkRunWhenNoTaskIsRunnable() throws Exception {
+        assertThat(page(writable()).select("#tasks-bulk-form, input[name=ref]")).isEmpty();
     }
 
     @Test
@@ -171,7 +196,7 @@ class RecurringControllerTest {
 
     private static Element row(Document doc, String task) {
         return doc.select("table.data tbody tr").stream()
-                .filter(tr -> tr.child(0).text().equals(task))
+                .filter(tr -> tr.select("td.task").text().equals(task))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no row for " + task));
     }

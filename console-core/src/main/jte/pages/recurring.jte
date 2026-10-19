@@ -1,6 +1,7 @@
 @import io.github.logicsatinn.dbscheduler.console.web.Fmt
 @param io.github.logicsatinn.dbscheduler.console.web.PageCtx ctx
 @param java.util.List<io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService.Row> rows
+!{boolean selectable = !ctx.readOnly() && rows.stream().anyMatch(r -> r.runNowInstance() != null);}
 @template.layout(ctx = ctx, title = "Recurring tasks", content = @`
     <h1>Task definitions</h1>
     <div class="card" id="recurring-region"
@@ -9,18 +10,33 @@
         @if(rows.isEmpty())
             <div class="empty">No task beans found in the application context.</div>
         @else
+            @if(selectable)
+                <form id="tasks-bulk-form" hx-post="${ctx.basePath()}/actions/bulk" hx-target="#flash" hx-swap="innerHTML">
+                    <input type="hidden" name="kind" value="RUN_NOW">
+                    <div class="toolbar">
+                        <button type="submit">Run selected now</button>
+                    </div>
+                </form>
+            @endif
             <table class="data">
-                <thead><tr><th>Task</th><th>Type</th><th>Next run</th><th>Last outcome</th><th></th></tr></thead>
+                <thead><tr>@if(selectable)<th></th>@endif<th>Task</th><th>Type</th><th>Next run</th><th>Last outcome</th><th></th></tr></thead>
                 <tbody>
                 @for(var row : rows)
                     <tr>
-                        <td>${row.taskName()}</td>
+                        @if(selectable)
+                            <td>
+                                @if(row.runNowInstance() != null)
+                                    <input type="checkbox" name="ref" value="${row.taskName()}::${row.runNowInstance()}" form="tasks-bulk-form" aria-label="Select ${row.taskName()}">
+                                @endif
+                            </td>
+                        @endif
+                        <td class="task">${row.taskName()}</td>
                         <td>${row.type()}</td>
-                        <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.nextExecution())}</td>
+                        <td class="time">${Fmt.ts(row.nextExecution())}</td>
                         <td>
                             @if(row.lastRun() != null)
                                 <span class="state ${row.lastRun().outcome().name().toLowerCase()}">${row.lastRun().outcome().name()}</span>
-                                <span class="muted">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastRun().startedAt())} · ${io.github.logicsatinn.dbscheduler.console.web.Fmt.duration(row.lastRun().durationMs())}</span>
+                                <span class="muted">${Fmt.ts(row.lastRun().startedAt())} · ${Fmt.duration(row.lastRun().durationMs())}</span>
                             @else
                                 <span class="muted">—</span>
                             @endif

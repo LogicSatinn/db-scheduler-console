@@ -68,7 +68,7 @@
             event.preventDefault();
             return;
         }
-        if (source.matches("#detail-live, #history-region, #executions-region")
+        if (source.matches("#detail-live, #history-region, #executions-region, #recurring-region")
             && (!trigger || trigger.type !== "dsc-refresh")
             && source.querySelector("details[open], input[name=ref]:checked, input[name=when]:focus, input[name=when]:valid")) {
             event.preventDefault();
