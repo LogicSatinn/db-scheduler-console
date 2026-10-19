@@ -218,17 +218,20 @@ The UI supports this policy (install it through the host security configuration)
 default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; frame-ancestors 'none'
 ```
 
-Handlers and styles are external. htmx evaluation, script-tag execution and injected indicator
-styles are disabled. This is a specific supported policy, not a promise of compatibility with every
-CSP. Host logout should invalidate sessions; HTTP Basic Auth has browser credential-cache semantics
-and is not a session logout mechanism.
+Handlers and styles are external. The console uses htmx 4 with evaluation (`hx-on`, `js:` values
+and trigger filters), script execution from swapped responses and injected indicator styles
+disabled. This is a specific supported policy, not a promise of compatibility with every CSP. Host
+logout should invalidate sessions; HTTP Basic Auth has browser credential-cache semantics and is
+not a session logout mechanism.
 
 ### Existing htmx snapshots and logout
 
-The layout sets `hx-history="false"`, and history cache misses force a fresh page request. The
-console removes only its own entries from htmx 2's `htmx-history-cache` array on startup and page exit.
-It clears sensitive DOM before browser back/forward caching and reloads restored pages for fresh
-authorization. Other host storage and unrelated htmx snapshots are preserved.
+htmx 4 keeps no history snapshots, and the layout sets `"history": "reload"` so back/forward
+navigation always requests a fresh page. Older console releases ran htmx 2, which stored snapshots in
+the `htmx-history-cache` localStorage array; the console still removes only its own entries from
+that array on startup and page exit. It clears sensitive DOM before browser back/forward caching
+and reloads restored pages for fresh authorization. Other host storage and unrelated htmx snapshots
+are preserved.
 
 For rollout and host logout, load the new `static/console.js` with `defer` from a host-authorized
 location, then call `window.dbSchedulerConsole.clearHistory(["/db-scheduler-console", "/previous-console-path"])`

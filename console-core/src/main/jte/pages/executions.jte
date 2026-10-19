@@ -14,7 +14,7 @@
           hx-get="${ctx.basePath()}/executions"
           hx-target="#executions-region" hx-select="#executions-region" hx-swap="outerHTML"
           hx-push-url="true"
-          hx-trigger="change, submit, input delay:500ms from:find input[name='q']">
+          hx-trigger="change, submit, input delay:500ms from:'find input[name=q]'">
         <label>State
             <select name="state">
                 <option value="">All</option>

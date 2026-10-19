@@ -30,27 +30,36 @@
         const flash = event.target.closest("[data-dismiss-flash]");
         if (flash) flash.remove();
     });
-    document.addEventListener("htmx:beforeRequest", event => {
-        const source = event.detail.elt;
-        const trigger = event.detail.requestConfig && event.detail.requestConfig.triggeringEvent;
-        // Explicit actions and form submissions must not be suppressed.
+    function rejected(status, target) {
+        return status >= 400 && status !== 400 && !(status === 404 && target?.id === "detail-live");
+    }
+    document.addEventListener("htmx:before:request", event => {
+        const source = event.detail.ctx.sourceElement;
+        const trigger = event.detail.ctx.sourceEvent;
         if (source.matches("#detail-live, #history-region, #executions-region")
             && (!trigger || trigger.type !== "dsc-refresh")
             && source.querySelector("details[open], input[name=ref]:checked, input[name=when]:focus, input[name=when]:valid")) {
             event.preventDefault();
         }
     });
-    document.addEventListener("htmx:beforeSwap", event => {
-        const status = event.detail.xhr.status;
+    document.addEventListener("htmx:before:history:update", event => {
+        if (rejected(event.detail.response?.status, event.detail.sourceElement)) event.preventDefault();
+    });
+    document.addEventListener("htmx:before:swap", event => {
+        const ctx = event.detail.ctx;
+        const status = ctx.response?.status;
         if (status === 401 || status === 403) {
+            event.preventDefault();
             clearConsoleHistory();
-            // A failed action can be a CSRF failure; force fresh host authorization.
             location.reload();
             return;
         }
-        if (status === 404 && event.detail.target.id === "detail-live" || status === 400) {
-            event.detail.shouldSwap = true;
-            event.detail.isError = false;
+        if (rejected(status, ctx.target)) {
+            event.preventDefault();
+            return;
+        }
+        for (const task of event.detail.tasks) {
+            task.fragment?.querySelectorAll("script").forEach(script => script.remove());
         }
     });
     document.addEventListener("toggle", async event => {
@@ -68,4 +77,8 @@
             preview.textContent = await response.text();
         } catch (_) { preview.textContent = "Preview unavailable"; delete details.dataset.loaded; }
     }, true);
+    const evaluationDisabled = function () { throw new Error("htmx evaluation is disabled"); };
+    htmx.registerExtension("db-scheduler-console", {
+        init(api) { api.initSecurity(null, evaluationDisabled, evaluationDisabled); }
+    });
 })();

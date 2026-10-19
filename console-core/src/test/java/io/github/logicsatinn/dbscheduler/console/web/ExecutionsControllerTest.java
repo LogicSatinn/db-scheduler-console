@@ -184,7 +184,7 @@ class ExecutionsControllerTest {
         assertThat(region.attr("hx-trigger"))
                 .startsWith("every 5s")
                 .endsWith(", dsc-refresh from:body");
-        assertThat(region.attr("hx-on::before-swap"))
+        assertThat(region.attr("hx-on::before:swap"))
                 .as("handlers are external for CSP")
                 .isEmpty();
     }

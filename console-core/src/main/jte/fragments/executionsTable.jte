@@ -10,7 +10,7 @@
 <div id="executions-region"
      hx-get="${refreshUrl}"
      hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body"
-     hx-select="#executions-region" hx-swap="outerHTML" hx-disinherit="hx-select">
+     hx-select="#executions-region" hx-swap="outerHTML">
     @if(!ctx.readOnly())
         <form id="bulk-form" hx-post="${ctx.basePath()}/actions/bulk" hx-target="#flash" hx-swap="innerHTML">
             <div class="toolbar">
