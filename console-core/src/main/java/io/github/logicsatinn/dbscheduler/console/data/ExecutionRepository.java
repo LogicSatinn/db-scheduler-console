@@ -46,11 +46,7 @@ public class ExecutionRepository {
         return tableName;
     }
 
-    public record LiveCounts(long scheduled, long due, long running, long retrying) {
-        /** @deprecated use {@link #retrying()} */
-        @Deprecated
-        public long failing() { return retrying; }
-    }
+    public record LiveCounts(long scheduled, long due, long running, long retrying) {}
 
     public String tableName() {
         return table;
