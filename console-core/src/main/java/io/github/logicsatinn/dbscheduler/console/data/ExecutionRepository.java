@@ -53,23 +53,76 @@ public class ExecutionRepository {
     }
 
     public Page<ExecutionRow> page(ExecutionFilter f, Instant now) {
+        return page(f, now, false);
+    }
+
+    public Page<ExecutionRow> page(ExecutionFilter f, Instant now, boolean includeFailed) {
+        int size = Keyset.size(f.pageSize());
+        String scope = Keyset.scope("executions", f.state(), f.taskName(), f.instanceContains(),
+                f.from(), f.to(), size, f.sort(), f.descending());
+        Keyset.Cursor cursor = Keyset.decode(f.cursor(), scope, 4);
+        String primary = f.sort().column();
+        Class<?> type = switch (f.sort()) {
+            case EXECUTION_TIME, LAST_HEARTBEAT -> Instant.class;
+            case CONSECUTIVE_FAILURES -> Integer.class;
+            case TASK_NAME -> String.class;
+        };
+        List<Keyset.Key> keys = List.of(
+                new Keyset.Key(primary, cursor == null ? null : Keyset.value(cursor.values().get(0), type), f.descending()),
+                new Keyset.Key("task_name", cursor == null ? null : Keyset.value(cursor.values().get(1), String.class), false),
+                new Keyset.Key("task_instance", cursor == null ? null : Keyset.value(cursor.values().get(2), String.class), false),
+                new Keyset.Key("parked", cursor == null ? null : Keyset.value(cursor.values().get(3), Integer.class), false));
+        if (cursor != null && (keys.get(1).value() == null || keys.get(2).value() == null
+                || keys.get(3).value() == null || !List.of(0, 1).contains(keys.get(3).value())
+                || f.sort() != SortColumn.LAST_HEARTBEAT && keys.get(0).value() == null))
+            throw new IllegalArgumentException("Invalid execution cursor");
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
         applyFilter(f, now, where, params);
+        boolean backwards = cursor != null && cursor.backwards();
+        if (cursor != null) Keyset.seek(where, params, keys, backwards, dialect);
+        String liveColumns = "task_name, task_instance, execution_time, picked, picked_by, "
+                + "last_success, last_failure, COALESCE(consecutive_failures, 0) AS consecutive_failures, last_heartbeat, version, priority, 0 AS parked";
+        String source = "SELECT " + liveColumns + " FROM " + table;
+        if (includeFailed) {
+            source += " UNION ALL SELECT task_name, task_instance, failed_at AS execution_time, "
+                    + ((dialect == Dialect.POSTGRES || dialect == Dialect.H2) ? "FALSE" : "0") + " AS picked, picked_by, "
+                    + "NULL AS last_success, failed_at AS last_failure, failure_count AS consecutive_failures, "
+                    + "NULL AS last_heartbeat, 0 AS version, priority, 1 AS parked FROM " + FailedExecutionRepository.TABLE;
+        }
+        String sql = "SELECT * FROM (" + source + ") dsc" + where
+                + Keyset.order(keys, backwards) + dialect.paginationClause();
+        params.addAll(Arrays.asList(dialect.paginationParams(0, size + 1)));
+        List<ExecutionRow> rows = jdbc.query(sql, (rs, n) -> new ExecutionRow(
+                rs.getString("task_name"), rs.getString("task_instance"), null,
+                instant(rs, "execution_time"), rs.getBoolean("picked"), rs.getString("picked_by"),
+                instant(rs, "last_success"), instant(rs, "last_failure"), rs.getInt("consecutive_failures"),
+                instant(rs, "last_heartbeat"), rs.getLong("version"), rs.getInt("priority"),
+                rs.getInt("parked") == 1, null, null, null, null), params.toArray());
+        return Keyset.page(rows, size, cursor, scope, row -> List.of(
+                new Keyset.Key(primary, switch (f.sort()) {
+                    case EXECUTION_TIME -> row.executionTime();
+                    case LAST_HEARTBEAT -> row.lastHeartbeat();
+                    case TASK_NAME -> row.taskName();
+                    case CONSECUTIVE_FAILURES -> row.consecutiveFailures();
+                }, f.descending()),
+                new Keyset.Key("task_name", row.taskName(), false),
+                new Keyset.Key("task_instance", row.instanceId(), false),
+                new Keyset.Key("parked", row.parked() ? 1 : 0, false)));
+    }
 
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + table + where, Long.class, params.toArray());
+    public byte[] payload(String task, String id, int maxBytes) {
+        return jdbc.query("SELECT task_data FROM " + table + " WHERE task_name = ? AND task_instance = ?", rs -> {
+            if (!rs.next()) return null;
+            try (var in = rs.getBinaryStream(1)) {
+                return in == null ? null : in.readNBytes(maxBytes + 1);
+            } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+        }, task, id);
+    }
 
-        String orderBy = " ORDER BY " + f.sort().column() + (f.descending() ? " DESC" : " ASC")
-                + ", task_name, task_instance";
-        String sql = "SELECT " + COLUMNS + " FROM " + table + where + orderBy
-                + dialect.paginationClause();
-        List<Object> pageParams = new ArrayList<>(params);
-        pageParams.addAll(Arrays.asList(
-                dialect.paginationParams(f.page() * f.pageSize(), f.pageSize())));
-
-        List<ExecutionRow> rows = jdbc.query(sql, this::mapRow, pageParams.toArray());
-        return new Page<>(rows, f.page(), f.pageSize(), total == null ? 0 : total);
+    public Optional<ExecutionRow> metadata(String task, String id) {
+        return jdbc.query("SELECT " + COLUMNS.replace("task_data,", "NULL AS task_data,") + " FROM " + table
+                + " WHERE task_name = ? AND task_instance = ?", this::mapRow, task, id).stream().findFirst();
     }
 
     public Optional<ExecutionRow> find(String taskName, String instanceId) {
@@ -126,6 +179,7 @@ public class ExecutionRepository {
     private void applyFilter(ExecutionFilter f, Instant now, StringBuilder where, List<Object> params) {
         if (f.state() != null) {
             appendStateCondition(f.state(), now, where, params);
+            if (f.state() != ExecutionState.FAILED) where.append(" AND parked = 0");
         }
         if (f.taskName() != null && !f.taskName().isBlank()) {
             where.append(" AND task_name = ?");
@@ -165,7 +219,7 @@ public class ExecutionRepository {
                 where.append(" AND execution_time > ?")
                         .append(add(params, dialect.jdbcTimestamp(now)));
             }
-            case FAILED -> where.append(" AND 1=0");
+            case FAILED -> where.append(" AND parked = 1");
         }
     }
 

@@ -50,12 +50,14 @@ class ExecutionsControllerTest {
         var repo = new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
         var failed = new FailedExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
         history = new HistoryRepository(ds, Dialect.H2);
+        var props = new ConsoleProperties();
+        props.setReadOnly(false);
         var controller = new ExecutionsController(
-                new PageCtxFactory(new ConsoleProperties()), new TemplateRenderer(),
+                new PageCtxFactory(props), new TemplateRenderer(),
                 new ExecutionsService(repo, failed), history, new TaskDataRenderer(null, true),
                 new StatsService(repo, failed, history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        mvc = MockMvcBuilders.standaloneSetup(controller)
+        mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new ConsoleErrors())
                 .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")
                 .build();
     }
@@ -88,11 +90,14 @@ class ExecutionsControllerTest {
         var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?q=i-2&size=10"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(doc.select("#executions-region tbody tr")).hasSize(10);
-        assertThat(doc.select(".pagination").text()).contains("Page 1 of 1");
+        assertThat(doc.select(".pagination").text()).contains("10 entries");
 
-        var page2 = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?size=10&page=1"))
+        var first = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?size=10"))
                 .andReturn().getResponse().getContentAsString());
-        assertThat(page2.select(".pagination").text()).contains("Page 2 of 3");
+        String next = first.select(".pagination a").last().attr("href");
+        var page2 = Jsoup.parse(mvc.perform(get(URI.create(next)))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(page2.select(".pagination").text()).contains("10 entries", "Previous", "Next");
         assertThat(page2.select("th a[href*='sort=EXECUTION_TIME']").attr("href")).contains("dir=desc");
     }
 
@@ -107,7 +112,10 @@ class ExecutionsControllerTest {
         var doc = Jsoup.parse(mvc.perform(
                         get("/db-scheduler-console/execution?task=email&id=order-1"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertThat(doc.select("pre.data").text()).contains("orderId");
+        assertThat(doc.text()).doesNotContain("orderId");
+        String payloadUrl = doc.select("details[data-payload-url]").attr("data-payload-url");
+        assertThat(mvc.perform(get(URI.create(payloadUrl))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).contains("orderId");
         assertThat(doc.select("details.stack pre").text()).contains("the-stack-trace");
         assertThat(doc.text()).contains("SCHEDULED");
     }
@@ -155,8 +163,7 @@ class ExecutionsControllerTest {
                 .startsWith("/db-scheduler-console/executions?")
                 .contains("state=SCHEDULED", "task=email", "sort=TASK_NAME", "dir=desc");
         assertThat(region.attr("hx-trigger"))
-                .startsWith("every 5s [")
-                .contains("input[name=ref]:checked")
+                .startsWith("every 5s")
                 .endsWith(", dsc-refresh from:body");
     }
 
@@ -175,12 +182,11 @@ class ExecutionsControllerTest {
                 .as("htmx fires before-swap on the target, so the region must be its own target")
                 .isFalse();
         assertThat(region.attr("hx-trigger"))
-                .startsWith("every 5s [")
-                .contains("details[open]", "input[name=when]:focus", "input[name=when]:valid")
+                .startsWith("every 5s")
                 .endsWith(", dsc-refresh from:body");
         assertThat(region.attr("hx-on::before-swap"))
-                .as("a job that vanished answers 404, which htmx would otherwise not show")
-                .contains("404");
+                .as("handlers are external for CSP")
+                .isEmpty();
     }
 
     @Test
@@ -207,4 +213,13 @@ class ExecutionsControllerTest {
                 .as("rendered as the region a polling detail page swaps in")
                 .contains("not found");
     }
+    @Test
+    void malformedFiltersAndCursorReturnControlledBadRequests() throws Exception {
+        for (String query : java.util.List.of("cursor=malformed", "size=2147483647", "size=-1", "sort=unknown",
+                "from=not-a-date", "dir=unknown", "state=unknown")) {
+            mvc.perform(get("/db-scheduler-console/executions?" + query))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
 }

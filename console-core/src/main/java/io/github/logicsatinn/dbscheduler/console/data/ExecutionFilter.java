@@ -8,13 +8,13 @@ public record ExecutionFilter(
         String instanceContains,
         Instant from,
         Instant to,
-        int page,
+        String cursor,
         int pageSize,
         SortColumn sort,
         boolean descending) {
 
-    public static ExecutionFilter none(int page, int pageSize) {
+    public static ExecutionFilter none(String cursor, int pageSize) {
         return new ExecutionFilter(null, null, null, null, null,
-                page, pageSize, SortColumn.EXECUTION_TIME, false);
+                cursor, pageSize, SortColumn.EXECUTION_TIME, false);
     }
 }

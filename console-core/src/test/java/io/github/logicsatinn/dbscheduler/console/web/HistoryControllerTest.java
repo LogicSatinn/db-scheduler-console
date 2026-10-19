@@ -76,13 +76,16 @@ class HistoryControllerTest {
         assertThat(region.attr("hx-select")).isEqualTo("#history-region");
         assertThat(region.attr("hx-swap")).isEqualTo("outerHTML");
         assertThat(region.attr("hx-trigger"))
-                .startsWith("every 5s [")
-                .contains("details[open]");
+                .isEqualTo("every 5s");
     }
 
     @Test
     void olderPagesDoNotPoll() throws Exception {
-        var region = Jsoup.parse(mvcFor(true).perform(get("/db-scheduler-console/history?page=1&size=1"))
+        var mvc = mvcFor(true);
+        var first = Jsoup.parse(mvc.perform(get("/db-scheduler-console/history?size=1"))
+                .andReturn().getResponse().getContentAsString());
+        String next = first.select(".pagination a").last().attr("href");
+        var region = Jsoup.parse(mvc.perform(get(java.net.URI.create(next)))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                 .getElementById("history-region");
 

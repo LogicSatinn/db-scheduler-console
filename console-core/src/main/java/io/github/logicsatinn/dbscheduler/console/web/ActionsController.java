@@ -35,6 +35,7 @@ public class ActionsController {
         if (props.isReadOnly()) {
             return readOnly();
         }
+        validateRef(task, id);
         return flash(actions.runNow(task, id));
     }
 
@@ -44,11 +45,12 @@ public class ActionsController {
         if (props.isReadOnly()) {
             return readOnly();
         }
+        validateRef(task, id);
         try {
             var instant = LocalDateTime.parse(when).atZone(ZoneId.systemDefault()).toInstant();
             return flash(actions.reschedule(task, id, instant));
         } catch (DateTimeParseException e) {
-            return flash(new ExecutionActions.ActionResult(false, "Invalid date/time: " + when));
+            throw new IllegalArgumentException("Invalid date/time");
         }
     }
 
@@ -57,6 +59,7 @@ public class ActionsController {
         if (props.isReadOnly()) {
             return readOnly();
         }
+        validateRef(task, id);
         return flash(actions.delete(task, id));
     }
 
@@ -66,12 +69,20 @@ public class ActionsController {
         if (props.isReadOnly()) {
             return readOnly();
         }
-        if (refs == null || refs.isEmpty()) {
-            return flash(new ExecutionActions.ActionResult(false, "Nothing selected"));
-        }
-        var parsed = refs.stream().map(ExecutionActions.InstanceRef::parse).toList();
-        var actionKind = ExecutionActions.Kind.valueOf(kind);
+        ExecutionActions.Kind actionKind;
+        try { actionKind = ExecutionActions.Kind.valueOf(kind); }
+        catch (RuntimeException e) { throw new IllegalArgumentException("Invalid action"); }
+        if (refs == null || refs.isEmpty() || refs.size() > 200)
+            throw new IllegalArgumentException("Select between 1 and 200 executions");
+        var parsed = refs.stream().map(ExecutionActions.InstanceRef::parse).distinct().toList();
+        parsed.forEach(ref -> validateRef(ref.taskName(), ref.instanceId()));
         return flash(actions.bulk(actionKind, parsed));
+    }
+
+    private static void validateRef(String task, String id) {
+        if (task == null || task.isBlank() || task.length() > 100 || task.contains("::")
+                || id == null || id.isBlank() || id.length() > 100)
+            throw new IllegalArgumentException("Invalid execution reference");
     }
 
     private ResponseEntity<String> flash(ExecutionActions.ActionResult result) {

@@ -69,7 +69,8 @@ public abstract class RepositoryContractTest {
         assertThat(upgradedHistory.forInstance("upgraded-task", "payload-instance", 1))
                 .singleElement()
                 .satisfies(entry -> {
-                    assertThat(entry.taskData()).containsExactly(9, 8, 7);
+                    assertThat(entry.taskData()).isNull();
+                    assertThat(upgradedHistory.payload(entry.id(), 65536)).containsExactly(9, 8, 7);
                     assertThat(entry.taskDataType()).isEqualTo("example.PayloadV1");
                 });
 
@@ -113,19 +114,20 @@ public abstract class RepositoryContractTest {
 
         for (ExecutionState state : java.util.List.of(ExecutionState.SCHEDULED,
                 ExecutionState.DUE, ExecutionState.RUNNING, ExecutionState.RETRYING)) {
-            var page = executions.page(new ExecutionFilter(state, null, null, null, null,
-                    0, 10, SortColumn.EXECUTION_TIME, false), NOW);
+            var page = executions.page(new ExecutionFilter(state, null, null, null, null, null, 10, SortColumn.EXECUTION_TIME, false), NOW);
             assertThat(page.items()).as("state %s", state).hasSize(1);
         }
         assertThat(executions.page(new ExecutionFilter(ExecutionState.FAILED, null, null,
-                null, null, 0, 10, SortColumn.EXECUTION_TIME, false), NOW).items()).isEmpty();
+                null, null, null, 10, SortColumn.EXECUTION_TIME, false), NOW).items()).isEmpty();
 
         for (int i = 0; i < 12; i++) {
             insertExecution("bulk", "i-%02d".formatted(i), NOW.plus(i, ChronoUnit.HOURS), false, 0);
         }
+        var first = executions.page(new ExecutionFilter(null, "bulk", null, null, null,
+                null, 5, SortColumn.EXECUTION_TIME, false), NOW);
         var page1 = executions.page(new ExecutionFilter(null, "bulk", null, null, null,
-                1, 5, SortColumn.EXECUTION_TIME, false), NOW);
-        assertThat(page1.total()).isEqualTo(12);
+                first.nextCursor(), 5, SortColumn.EXECUTION_TIME, false), NOW);
+        assertThat(page1.nextCursor()).isNotNull();
         assertThat(page1.items()).extracting(ExecutionRow::instanceId).first().isEqualTo("i-05");
 
         var counts = executions.counts(NOW);
@@ -185,12 +187,12 @@ public abstract class RepositoryContractTest {
                 1000, null, null, null, "node-1"));
 
         assertThat(history.tableExists()).isTrue();
-        assertThat(history.page(new HistoryFilter(null, null, "boom", null, null, 0, 10)).items()).hasSize(1);
+        assertThat(history.page(new HistoryFilter(null, null, "boom", null, null, null, 10)).items()).hasSize(1);
         assertThat(history.forInstance("email", "1", 10)).hasSize(2);
         assertThat(history.recentFailures(5)).hasSize(1);
         assertThat(history.countsSince(NOW.minus(1, ChronoUnit.DAYS)).failed()).isEqualTo(1);
         assertThat(history.window(NOW.minus(1, ChronoUnit.HOURS), NOW, 100)).hasSize(1);
-        assertThat(history.forInstance("email", "1", 1).get(0).taskData())
+        assertThat(history.payload(history.forInstance("email", "1", 1).get(0).id(), 65536))
                 .containsExactly(new byte[] {1, 2, 3});
         assertThat(history.purgeOlderThan(NOW.minus(14, ChronoUnit.DAYS))).isEqualTo(1);
     }
@@ -215,7 +217,7 @@ public abstract class RepositoryContractTest {
         assertThat(parked.priority()).isEqualTo(6);
         assertThat(parked.state(NOW)).isEqualTo(ExecutionState.FAILED);
         assertThat(failedExecutions.page(new ExecutionFilter(ExecutionState.FAILED,
-                null, null, null, null, 0, 10, SortColumn.EXECUTION_TIME, false)).total())
+                null, null, null, null, null, 10, SortColumn.EXECUTION_TIME, false)).items().size())
                 .isEqualTo(1);
 
         assertThat(failedExecutions.requeue(parked, NOW.plusSeconds(5))).isTrue();

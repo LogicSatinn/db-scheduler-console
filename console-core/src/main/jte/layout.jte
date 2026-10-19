@@ -8,9 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title} · db-scheduler-console</title>
     <link rel="stylesheet" href="${ctx.basePath()}/static/console.css">
+    <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"refreshOnHistoryMiss":true}'>
+    <script src="${ctx.basePath()}/static/console.js" defer></script>
     <script src="${ctx.basePath()}/static/htmx.min.js" defer></script>
 </head>
-<body hx-headers="${ctx.csrfHeaderJson()}">
+<body hx-history="false" data-console-base="${ctx.basePath()}" hx-headers="${ctx.csrfHeaderJson()}">
 <div class="shell">
     <nav class="nav">
         <span class="brand">db-scheduler-console</span>

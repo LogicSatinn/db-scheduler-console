@@ -77,7 +77,8 @@ class FailedExecutionRepositoryTest {
         assertThat(SERIALIZER.deserialize(Payload.class, parked.taskData())).isEqualTo(payload);
 
         var actions = new ExecutionActions(client, Clock.fixed(NOW.plusSeconds(5), ZoneOffset.UTC),
-                failed, SERIALIZER, List.of(TASK));
+                failed, new io.github.logicsatinn.dbscheduler.console.service.FilteringJavaSerializer(
+                        java.io.ObjectInputFilter.Config.createFilter(Payload.class.getName() + ";!*")), List.of(TASK));
         assertThat(actions.runNow("payment", "run-1").success()).isTrue();
         assertThat(failed.find("payment", "run-1")).isEmpty();
 
@@ -176,4 +177,15 @@ class FailedExecutionRepositoryTest {
     }
 
     record Payload(String transactionId) implements Serializable { }
+    @Test
+    void defaultJavaRequeueRequiresHostFilterAndLeavesParkedRowIntact() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.io.ObjectInputFilter.Config.getSerialFilter() == null);
+        parksAndRequeuesPreparation("needs-filter");
+        var actions = new ExecutionActions(client, Clock.fixed(NOW, ZoneOffset.UTC), failed, SERIALIZER, List.of(TASK));
+        var result = actions.runNow("payment", "needs-filter");
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("deserialization filter");
+        assertThat(failed.find("payment", "needs-filter")).isPresent();
+    }
+
 }

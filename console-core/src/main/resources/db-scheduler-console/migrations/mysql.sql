@@ -14,9 +14,9 @@ create table dsc_execution_history (
   task_data_type varchar(512)
 );
 
-create index dsc_eh_task_time_idx on dsc_execution_history (task_name, started_at);
-create index dsc_eh_time_idx on dsc_execution_history (started_at);
-create index dsc_eh_outcome_time_idx on dsc_execution_history (outcome, started_at);
+create index dsc_eh_task_time_idx on dsc_execution_history (task_name, started_at, id);
+create index dsc_eh_time_idx on dsc_execution_history (started_at, id);
+create index dsc_eh_outcome_time_idx on dsc_execution_history (outcome, started_at, id);
 create index dsc_eh_finished_idx on dsc_execution_history (finished_at);
 
 create table dsc_failed_execution (
@@ -34,4 +34,4 @@ create table dsc_failed_execution (
   primary key (task_name, task_instance)
 );
 
-create index dsc_fe_failed_at_idx on dsc_failed_execution (failed_at);
+create index dsc_fe_failed_at_idx on dsc_failed_execution (failed_at, task_name, task_instance);

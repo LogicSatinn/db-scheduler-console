@@ -1,5 +1,8 @@
 package io.github.logicsatinn.dbscheduler.console.boot3;
 
+import io.github.logicsatinn.dbscheduler.console.web.ConsoleErrors;
+import io.github.logicsatinn.dbscheduler.console.web.ConsoleRequestInterceptor;
+import io.github.logicsatinn.dbscheduler.console.service.TrustedTaskDataFormatter;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerCustomizer;
 import com.github.kagkarlsson.scheduler.serializer.Serializer;
@@ -86,8 +89,8 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     TaskDataRenderer dbSchedulerConsoleTaskDataRenderer(ConsoleProperties props,
-            ObjectProvider<DbSchedulerCustomizer> customizer) {
-        return new TaskDataRenderer(effectiveSerializer(customizer),
+            ObjectProvider<TrustedTaskDataFormatter> formatter) {
+        return new TaskDataRenderer(formatter.getIfAvailable(),
                 props.getTaskData().isVisible());
     }
 
@@ -146,10 +149,17 @@ public class DbSchedulerConsoleAutoConfiguration {
         return new WebMvcConfigurer() {
             @Override
             public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(new ConsoleRequestInterceptor(props))
+                        .addPathPatterns(props.getBasePath(), props.getBasePath() + "/**");
                 registry.addInterceptor(new ConsoleAvailabilityInterceptor(availability))
-                        .addPathPatterns(props.getBasePath() + "/**");
+                        .addPathPatterns(props.getBasePath(), props.getBasePath() + "/**");
             }
         };
+    }
+
+    @Bean
+    ConsoleErrors dbSchedulerConsoleErrors() {
+        return new ConsoleErrors();
     }
 
     private static Serializer effectiveSerializer(

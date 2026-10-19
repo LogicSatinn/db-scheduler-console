@@ -74,7 +74,7 @@ class SchedulerParkingIntegrationTest {
 
         Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             assertThat(failed.count()).isEqualTo(1);
-            assertThat(history.page(HistoryFilter.none(0, 20)).total()).isEqualTo(4);
+            assertThat(history.page(HistoryFilter.none(null, 20)).items().size()).isEqualTo(4);
         });
         assertThat(received.get()).isEqualTo(payload);
         assertThat(failed.find(task.getName(), "attempt-1").orElseThrow().priority()).isEqualTo(8);
@@ -83,21 +83,22 @@ class SchedulerParkingIntegrationTest {
 
         shouldSucceed.set(true);
         var actions = new ExecutionActions(scheduler, Clock.systemUTC(), failed,
-                Serializer.DEFAULT_JAVA_SERIALIZER, List.of(task));
+                new FilteringJavaSerializer(java.io.ObjectInputFilter.Config.createFilter(
+                        Payload.class.getName() + ";!*")), List.of(task));
         assertThat(actions.runNow(task.getName(), "attempt-1").success()).isTrue();
         scheduler.triggerCheckForDueExecutions();
 
         Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             assertThat(failed.count()).isZero();
-            assertThat(history.page(HistoryFilter.none(0, 20)).total()).isEqualTo(1);
+            assertThat(history.page(HistoryFilter.none(null, 20)).items().size()).isEqualTo(1);
             assertThat(new ExecutionRepository(dataSource, "scheduled_tasks", Dialect.H2)
                     .find(task.getName(), "attempt-1")).isEmpty();
         });
-        assertThat(history.page(HistoryFilter.none(0, 20)).items())
+        assertThat(history.page(HistoryFilter.none(null, 20)).items())
                 .anySatisfy(entry -> {
                     assertThat(entry.outcome().name()).isEqualTo("SUCCEEDED");
                     assertThat(Serializer.DEFAULT_JAVA_SERIALIZER.deserialize(
-                            Payload.class, entry.taskData())).isEqualTo(payload);
+                            Payload.class, history.payload(entry.id(), 65536))).isEqualTo(payload);
                 });
     }
 

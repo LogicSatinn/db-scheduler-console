@@ -4,10 +4,10 @@
 @param io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter filter
 @param String queryBase
 @param io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer taskData
-!{boolean live = filter.page() == 0;}
+!{boolean live = filter.cursor() == null;}
 <div id="history-region"
      hx-get="${live ? ctx.basePath() + "/history" + queryBase : null}"
-     hx-trigger="${live ? "every " + ctx.pollSeconds() + "s [!this.querySelector('details[open]')]" : null}"
+     hx-trigger="${live ? "every " + ctx.pollSeconds() + "s" : null}"
      hx-select="#history-region" hx-swap="outerHTML">
     <table class="data">
         <thead><tr><th>Task</th><th>Instance</th><th>Outcome</th><th>Started</th><th>Duration</th><th>Node</th><th>Payload</th><th>Error</th></tr></thead>
@@ -24,8 +24,8 @@
                 <td class="num">${io.github.logicsatinn.dbscheduler.console.web.Fmt.duration(h.durationMs())}</td>
                 <td>${h.pickedBy()}</td>
                 <td>
-                    @if(h.taskData() != null)
-                        <details><summary>${h.taskDataType()}</summary><pre>${taskData.render(h.taskData())}</pre></details>
+                    @if(taskData.visible())
+                        <details data-payload-url="${ctx.basePath()}/payload/history?id=${h.id()}"><summary>View payload</summary><pre>Open to load</pre></details>
                     @endif
                 </td>
                 <td>
@@ -40,12 +40,12 @@
         </tbody>
     </table>
     <div class="pagination">
-        @if(filter.page() > 0)
-            <a href="${ctx.basePath()}/history${queryBase}&page=${filter.page() - 1}">‹ Prev</a>
+        @if(page.previousCursor() != null)
+            <a href="${ctx.basePath() + "/history" + queryBase}&cursor=${Fmt.url(page.previousCursor())}">‹ Previous</a>
         @endif
-        <span>Page ${filter.page() + 1} of ${Math.max(1, page.totalPages())} · ${page.total()} total</span>
-        @if(filter.page() + 1 < page.totalPages())
-            <a href="${ctx.basePath()}/history${queryBase}&page=${filter.page() + 1}">Next ›</a>
+        <span>${page.items().size()} entries</span>
+        @if(page.nextCursor() != null)
+            <a href="${ctx.basePath() + "/history" + queryBase}&cursor=${Fmt.url(page.nextCursor())}">Next ›</a>
         @endif
     </div>
 </div>

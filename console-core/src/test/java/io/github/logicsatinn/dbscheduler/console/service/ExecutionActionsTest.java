@@ -128,4 +128,14 @@ class ExecutionActionsTest {
         var ref = new ExecutionActions.InstanceRef("t", "i");
         assertThat(ExecutionActions.InstanceRef.parse(ref.composite())).isEqualTo(ref);
     }
+    @Test
+    void unexpectedErrorsDoNotExposeExceptionMessages() {
+        var broken = org.mockito.Mockito.mock(SchedulerClient.class);
+        org.mockito.Mockito.when(broken.reschedule(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalStateException("password=secret SQL internals"));
+        var result = new ExecutionActions(broken, Clock.fixed(NOW, ZoneOffset.UTC)).runNow("task", "id");
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("Reference:").doesNotContain("secret", "SQL", "password");
+    }
+
 }

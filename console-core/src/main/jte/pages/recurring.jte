@@ -27,7 +27,7 @@
                         </td>
                         <td>
                             @if(!ctx.readOnly() && row.runNowInstance() != null)
-                                <form style="display:inline" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
+                                <form class="inline-form" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
                                     <input type="hidden" name="task" value="${row.taskName()}">
                                     <input type="hidden" name="id" value="${row.runNowInstance()}">
                                     <button type="submit">Run now</button>

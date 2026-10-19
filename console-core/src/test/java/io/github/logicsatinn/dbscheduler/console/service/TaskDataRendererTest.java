@@ -36,26 +36,27 @@ class TaskDataRendererTest {
     }
 
     @Test
-    void serializerWinsWhenItWorks() {
-        Serializer serializer = new Serializer() {
-            @Override public byte[] serialize(Object data) { return new byte[0]; }
-            @Override @SuppressWarnings("unchecked")
-            public <T> T deserialize(Class<T> clazz, byte[] data) { return (T) "MyData[id=7]"; }
-        };
-        var r = new TaskDataRenderer(serializer, true);
-        assertThat(r.render(new byte[] {1})).isEqualTo("MyData[id=7]");
+    void trustedFormatterIsExplicitAndBounded() {
+        var renderer = new TaskDataRenderer(bytes -> "trusted output", true);
+        assertThat(renderer.render(new byte[] {1})).isEqualTo("trusted output");
+        assertThat(renderer.render(new byte[TaskDataRenderer.MAX_BYTES + 1])).contains("exceeds preview limit");
+        assertThat(new TaskDataRenderer(bytes -> { throw new IllegalStateException("secret"); }, true)
+                .render(new byte[] {1})).isEqualTo("Preview unavailable");
     }
 
+    static boolean callback;
+    static class Payload implements java.io.Serializable {
+        private void readObject(java.io.ObjectInputStream input) throws Exception {
+            input.defaultReadObject(); callback = true;
+        }
+        public String toString() { callback = true; return "unsafe"; }
+    }
     @Test
-    void throwingSerializerFallsThrough() {
-        Serializer serializer = new Serializer() {
-            @Override public byte[] serialize(Object data) { return new byte[0]; }
-            @Override public <T> T deserialize(Class<T> clazz, byte[] data) {
-                throw new IllegalStateException("unknown class");
-            }
-        };
-        var r = new TaskDataRenderer(serializer, true);
-        assertThat(r.render("plain text".getBytes(StandardCharsets.UTF_8))).isEqualTo("plain text");
+    void javaPayloadNeverExecutesCallbacks() {
+        callback = false;
+        byte[] bytes = Serializer.DEFAULT_JAVA_SERIALIZER.serialize(new Payload());
+        assertThat(new TaskDataRenderer(null, true).render(bytes)).startsWith("binary (");
+        assertThat(callback).isFalse();
     }
 
     @Test

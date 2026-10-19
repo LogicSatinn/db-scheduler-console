@@ -1,5 +1,6 @@
 package io.github.logicsatinn.dbscheduler.console.web;
 
+import io.github.logicsatinn.dbscheduler.console.data.Keyset;
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter;
@@ -40,7 +41,7 @@ public class HistoryController {
 
     public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
             HistoryRepository history, Dialect dialect) {
-        this(ctxFactory, templates, history, dialect, new TaskDataRenderer(null, true));
+        this(ctxFactory, templates, history, dialect, new TaskDataRenderer(null, false));
     }
 
     @GetMapping("/history")
@@ -50,7 +51,7 @@ public class HistoryController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "25") int size,
             HttpServletRequest request) {
         var ctx = ctxFactory.page("history", request);
@@ -66,13 +67,14 @@ public class HistoryController {
         if (outcome != null && !outcome.isBlank()) {
             try {
                 parsedOutcome = HistoryEntry.Outcome.valueOf(outcome.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid outcome");
             }
         }
         var filter = new HistoryFilter(
                 blankToNull(task), parsedOutcome, blankToNull(q),
                 parseLocal(from), parseLocal(to),
-                Math.max(0, page), Math.min(200, Math.max(1, size)));
+                cursor, Keyset.size(size));
 
         Map<String, Object> model = new HashMap<>();
         model.put("ctx", ctx);
@@ -87,6 +89,13 @@ public class HistoryController {
                 ? history.upgradeTableScript() : "");
         model.put("queryBase", queryBase(task, outcome, q, from, to, size));
         return templates.page("pages/history.jte", model);
+    }
+
+    @GetMapping(value = "/payload/history", produces = "text/plain;charset=UTF-8")
+    public ResponseEntity<String> payload(@RequestParam long id) {
+        if (!taskData.visible()) return ResponseEntity.status(403).body("Payloads are hidden");
+        if (id <= 0) throw new IllegalArgumentException("Invalid history id");
+        return ResponseEntity.ok(taskData.render(history.payload(id, TaskDataRenderer.MAX_BYTES)));
     }
 
     private static String queryBase(String task, String outcome, String q, String from, String to, int size) {
@@ -117,7 +126,7 @@ public class HistoryController {
         try {
             return LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant();
         } catch (DateTimeParseException e) {
-            return null;
+            throw new IllegalArgumentException("Invalid date/time");
         }
     }
 }

@@ -22,7 +22,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "demo.console.username=admin", "demo.console.password=test-only-password",
+        "db-scheduler-console.read-only=false", "db-scheduler-console.base-path=/operations"})
 class DemoAppSmokeTest {
 
     @Value("${local.server.port}")
@@ -38,7 +40,7 @@ class DemoAppSmokeTest {
     HistoryRepository history;
 
     static final String AUTH = "Basic " + Base64.getEncoder().encodeToString(
-            "admin:demo-password".getBytes(StandardCharsets.UTF_8));
+            "admin:test-only-password".getBytes(StandardCharsets.UTF_8));
     static final Pattern CSRF = Pattern.compile("\\{\\\"([^\\\"]+)\\\":\\\"([^\\\"]+)\\\"}");
 
     final HttpClient http = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
@@ -54,6 +56,7 @@ class DemoAppSmokeTest {
     HttpResponse<String> post(String path, String csrfHeader, String csrfToken) throws Exception {
         var request = HttpRequest.newBuilder(uri(path))
                 .header("Authorization", AUTH)
+                .header("HX-Request", "true")
                 .header("Content-Type", "application/x-www-form-urlencoded");
         if (csrfHeader != null) {
             request.header(csrfHeader, csrfToken);
@@ -68,26 +71,27 @@ class DemoAppSmokeTest {
 
     @Test
     void allPagesServe() throws Exception {
-        var anonymous = http.send(HttpRequest.newBuilder(uri("/db-scheduler-console/overview"))
+        var anonymous = http.send(HttpRequest.newBuilder(uri("/operations/overview"))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(anonymous.statusCode()).isEqualTo(401);
-        assertThat(get("/db-scheduler-console/overview")).contains("db-scheduler-console");
-        assertThat(get("/db-scheduler-console/executions")).contains("Executions");
-        assertThat(get("/db-scheduler-console/recurring")).contains("demo-steady");
-        assertThat(get("/db-scheduler-console/history")).contains("history");
-        assertThat(get("/db-scheduler-console/static/htmx.min.js")).contains("htmx");
+        assertThat(anonymous.headers().firstValue("www-authenticate").orElse("")).startsWith("Basic ");
+        assertThat(get("/operations/overview")).contains("db-scheduler-console");
+        assertThat(get("/operations/executions")).contains("Executions");
+        assertThat(get("/operations/recurring")).contains("demo-steady");
+        assertThat(get("/operations/history")).contains("history");
+        assertThat(get("/operations/static/htmx.min.js")).contains("htmx");
     }
 
     @Test
     void mutationsRequireCsrfInAdditionToBasicAuthentication() throws Exception {
-        assertThat(post("/db-scheduler-console/actions/run-now", null, null).statusCode())
+        assertThat(post("/operations/actions/run-now", null, null).statusCode())
                 .isEqualTo(403);
 
-        String headers = Jsoup.parse(get("/db-scheduler-console/executions"))
+        String headers = Jsoup.parse(get("/operations/executions"))
                 .selectFirst("body").attr("hx-headers");
         var matcher = CSRF.matcher(headers);
         assertThat(matcher.matches()).isTrue();
-        assertThat(post("/db-scheduler-console/actions/run-now",
+        assertThat(post("/operations/actions/run-now",
                 matcher.group(1), matcher.group(2)).statusCode()).isEqualTo(200);
     }
 
@@ -106,4 +110,20 @@ class DemoAppSmokeTest {
         assertThat(scheduler.getScheduledExecution(TaskInstanceId.of(
                 HistoryPurgeTask.NAME, RecurringTask.INSTANCE))).isPresent();
     }
+    @Test
+    void rootDescendantsAndFallbackAreProtected() throws Exception {
+        for (String path : java.util.List.of("/operations", "/operations/history", "/operations/payload/history?id=1")) {
+            var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(uri(path)).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).as(path).isEqualTo(401);
+        }
+        var fallback = http.send(HttpRequest.newBuilder(uri("/unmatched")).header("Authorization", AUTH).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(fallback.statusCode()).isEqualTo(403);
+        var hidden = http.send(HttpRequest.newBuilder(uri("/operations/payload/history?id=1"))
+                .header("Authorization", AUTH).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(hidden.statusCode()).isEqualTo(403);
+        assertThat(hidden.headers().firstValue("cache-control").orElse("")).contains("no-store");
+    }
+
 }
