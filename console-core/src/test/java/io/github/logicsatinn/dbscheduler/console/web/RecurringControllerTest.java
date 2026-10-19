@@ -126,6 +126,14 @@ class RecurringControllerTest {
     }
 
     @Test
+    void everyPageOffersThePollingToggle() throws Exception {
+        var doc = page(writable());
+
+        assertThat(doc.select(".nav button[data-live-toggle]").attr("type")).isEqualTo("button");
+        assertThat(doc.select(".nav [data-live-status]").attr("role")).isEqualTo("status");
+    }
+
+    @Test
     void tableRefreshesOnThePollingIntervalAndAfterAnAction() throws Exception {
         var props = new ConsoleProperties();
         props.setPollingInterval(Duration.ofSeconds(1));

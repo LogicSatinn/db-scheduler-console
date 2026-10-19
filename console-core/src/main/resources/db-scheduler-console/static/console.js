@@ -29,13 +29,45 @@
     document.addEventListener("click", event => {
         const flash = event.target.closest("[data-dismiss-flash]");
         if (flash) flash.remove();
+        if (event.target.closest("[data-live-toggle]")) setPollingPaused(!paused);
     });
+    const pauseKey = "db-scheduler-console:polling-paused";
+    function storedPollingPaused() {
+        try { return localStorage.getItem(pauseKey) === "true"; } catch (_) { return false; }
+    }
+    let paused = storedPollingPaused();
+    function renderPolling() {
+        document.body.toggleAttribute("data-polling-paused", paused);
+        document.querySelectorAll("[data-live-status]").forEach(status => {
+            status.textContent = paused ? "Updates paused" : "Live";
+        });
+        document.querySelectorAll("[data-live-toggle]").forEach(toggle => {
+            toggle.textContent = paused ? "Resume updates" : "Pause updates";
+        });
+    }
+    function setPollingPaused(value) {
+        paused = value;
+        try {
+            if (paused) localStorage.setItem(pauseKey, "true"); else localStorage.removeItem(pauseKey);
+        } catch (_) { }
+        renderPolling();
+        if (!paused) {
+            document.querySelectorAll("[hx-trigger*='every']").forEach(region =>
+                region.dispatchEvent(new CustomEvent("every")));
+        }
+    }
+    renderPolling();
+    window.addEventListener("storage", event => { if (event.key === pauseKey) { paused = storedPollingPaused(); renderPolling(); } });
     function rejected(status, target) {
         return status >= 400 && status !== 400 && !(status === 404 && target?.id === "detail-live");
     }
     document.addEventListener("htmx:before:request", event => {
         const source = event.detail.ctx.sourceElement;
         const trigger = event.detail.ctx.sourceEvent;
+        if (trigger?.type === "every" && paused) {
+            event.preventDefault();
+            return;
+        }
         if (source.matches("#detail-live, #history-region, #executions-region")
             && (!trigger || trigger.type !== "dsc-refresh")
             && source.querySelector("details[open], input[name=ref]:checked, input[name=when]:focus, input[name=when]:valid")) {

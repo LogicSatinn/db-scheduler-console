@@ -43,6 +43,11 @@ a { color: var(--accent); }
 .nav a { color: var(--ink-2); text-decoration: none; padding: 4px 10px; border-radius: 6px; }
 .nav a:hover { color: var(--ink); }
 .nav a.active { color: var(--ink); background: var(--surface); border: 1px solid var(--border); }
+.nav-end { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.live-status { font-size: 12px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.live-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--status-good); }
+body[data-polling-paused] .live-status::before { background: var(--status-warning); }
+.live-toggle { font-size: 12px; padding: 3px 10px; }
 .badge {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--status-critical); border: 1px solid currentColor;

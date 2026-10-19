@@ -88,7 +88,7 @@ before atomically requeueing the same instance, payload, and priority.
 | `db-scheduler-console.read-only` | `true` | Hide and block (403) all mutating actions |
 | `db-scheduler-console.allow-framing` | `false` | Permit host-controlled embedding; does not weaken host headers |
 | `db-scheduler-console.external-origin` | unset | Expected external origin for mutation Origin checks |
-| `db-scheduler-console.polling-interval` | `5s` | UI refresh cadence |
+| `db-scheduler-console.polling-interval` | `5s` | UI refresh cadence; viewers can pause and resume it from the navigation bar |
 | `db-scheduler-console.history.enabled` | `true` | Record execution history |
 | `db-scheduler-console.history.store-task-data` | `false` | Retain serialized payloads in history |
 | `db-scheduler-console.history.retention` | `14d` | Purge history older than this |
