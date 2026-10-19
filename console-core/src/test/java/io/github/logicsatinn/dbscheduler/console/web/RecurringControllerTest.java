@@ -107,6 +107,25 @@ class RecurringControllerTest {
     }
 
     @Test
+    void usesTheConfiguredConsoleTitle() throws Exception {
+        var props = writable();
+        props.setTitle("Payments scheduler");
+
+        var doc = page(props);
+
+        assertThat(doc.title()).isEqualTo("Recurring tasks · Payments scheduler");
+        assertThat(doc.select(".nav .brand").text()).isEqualTo("Payments scheduler");
+    }
+
+    @Test
+    void blankTitleFallsBackToTheDefault() throws Exception {
+        var props = writable();
+        props.setTitle("  ");
+
+        assertThat(page(props).select(".nav .brand").text()).isEqualTo("db-scheduler-console");
+    }
+
+    @Test
     void tableRefreshesOnThePollingIntervalAndAfterAnAction() throws Exception {
         var props = new ConsoleProperties();
         props.setPollingInterval(Duration.ofSeconds(1));

@@ -83,6 +83,7 @@ before atomically requeueing the same instance, payload, and priority.
 | Property | Default | Description |
 |---|---|---|
 | `db-scheduler-console.enabled` | `true` | Master switch |
+| `db-scheduler-console.title` | `db-scheduler-console` | Name shown in the navigation bar and browser tab |
 | `db-scheduler-console.base-path` | `/db-scheduler-console` | URL prefix |
 | `db-scheduler-console.read-only` | `true` | Hide and block (403) all mutating actions |
 | `db-scheduler-console.allow-framing` | `false` | Permit host-controlled embedding; does not weaken host headers |

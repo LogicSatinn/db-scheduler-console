@@ -17,6 +17,8 @@ public class PageCtxFactory {
                 props.isReadOnly(),
                 Math.max(1, props.getPollingInterval().toSeconds()),
                 CsrfSupport.headerJson(request),
-                active);
+                active,
+                props.getTitle() == null || props.getTitle().isBlank()
+                        ? "db-scheduler-console" : props.getTitle().strip());
     }
 }

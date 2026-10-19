@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ConsoleProperties {
 
     private boolean enabled = true;
+    private String title = "db-scheduler-console";
     private String basePath = "/db-scheduler-console";
     private boolean readOnly = true;
     private boolean allowFraming = false;
@@ -20,6 +21,8 @@ public class ConsoleProperties {
     public String getExternalOrigin() { return externalOrigin; }
     public void setExternalOrigin(String value) { externalOrigin = value; }
 
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getBasePath() { return basePath; }
@@ -33,10 +36,13 @@ public class ConsoleProperties {
 
     public static class History {
         private boolean enabled = true;
+    private String title = "db-scheduler-console";
         private boolean storeTaskData = false;
         private Duration retention = Duration.ofDays(14);
 
-        public boolean isEnabled() { return enabled; }
+        public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public boolean isStoreTaskData() { return storeTaskData; }
         public void setStoreTaskData(boolean storeTaskData) { this.storeTaskData = storeTaskData; }

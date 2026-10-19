@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${title} · db-scheduler-console</title>
+    <title>${title} · ${ctx.title()}</title>
     <link rel="stylesheet" href="${ctx.basePath()}/static/console.css">
     <meta name="htmx-config" content='{"includeIndicatorCSS":false,"history":"reload"}'>
     <script src="${ctx.basePath()}/static/htmx.min.js" defer></script>
@@ -15,7 +15,7 @@
 <body data-console-base="${ctx.basePath()}" hx-headers:inherited="${ctx.csrfHeaderJson()}">
 <div class="shell">
     <nav class="nav">
-        <span class="brand">db-scheduler-console</span>
+        <span class="brand">${ctx.title()}</span>
         <a href="${ctx.basePath()}/overview" class="@if(ctx.active().equals("overview"))active@endif">Overview</a>
         <a href="${ctx.basePath()}/executions" class="@if(ctx.active().equals("executions"))active@endif">Executions</a>
         <a href="${ctx.basePath()}/recurring" class="@if(ctx.active().equals("recurring"))active@endif">Recurring</a>
