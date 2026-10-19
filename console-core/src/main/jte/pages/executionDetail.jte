@@ -6,10 +6,6 @@
 @param String selfUrl
 @template.layout(ctx = ctx, title = row.taskName() + " / " + row.instanceId(), content = @`
     <h1>${row.taskName()} <span class="muted">/</span> ${row.instanceId()}</h1>
-    <%-- Polls until the execution leaves the live table; pauses while a reschedule time is being entered
-         or a stack trace is open. Once gone, the response is the executionGone page, whose #detail-live has
-         no polling. A deleted execution with no history answers 404, which htmx only swaps when told to;
-         htmx fires before-swap on the target, so this element must be its own target. --%>
     <div id="detail-live" hx-get="${selfUrl}"
          hx-trigger="every ${ctx.pollSeconds()}s [!this.querySelector('details[open], input[name=when]:focus, input[name=when]:valid')], dsc-refresh from:body"
          hx-on::before-swap="if (event.detail.xhr.status === 404) { event.detail.shouldSwap = true; event.detail.isError = false; }"

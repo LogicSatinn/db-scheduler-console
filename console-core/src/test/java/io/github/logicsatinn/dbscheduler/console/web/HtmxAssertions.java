@@ -10,10 +10,6 @@ final class HtmxAssertions {
 
     private HtmxAssertions() {}
 
-    /**
-     * htmx inherits hx-select from ancestors. An action form inside a refreshable region would
-     * otherwise filter its flash response through the region's selector and swap in nothing.
-     */
     static void actionFormsDoNotInheritRegionSelect(Document doc) {
         var forms = doc.select("form[hx-post]");
         assertThat(forms).as("action forms").isNotEmpty();

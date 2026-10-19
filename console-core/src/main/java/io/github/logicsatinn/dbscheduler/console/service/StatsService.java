@@ -55,7 +55,6 @@ public class StatsService {
                 outcomes.succeeded(), outcomes.failed());
     }
 
-    /** 24 hour-aligned buckets, oldest first; empty list if history is unavailable. */
     public List<HourBucket> throughputLast24h() {
         if (!historyAvailable()) {
             return List.of();

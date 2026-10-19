@@ -46,7 +46,6 @@ class HistoryPurgeTaskTest {
         taskLog.detachAppender(logged);
     }
 
-    /** db-scheduler's own schema only — the optional history migration has not been applied. */
     static DataSource withoutHistoryTable() {
         return new EmbeddedDatabaseBuilder()
                 .setType(EmbeddedDatabaseType.H2)

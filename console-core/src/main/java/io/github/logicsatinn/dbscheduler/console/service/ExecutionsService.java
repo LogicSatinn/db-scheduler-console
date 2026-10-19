@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 
-/** Combines db-scheduler's live table with the console's parked-failure table. */
 public class ExecutionsService {
 
     private final ExecutionRepository live;

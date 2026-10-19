@@ -14,7 +14,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.transaction.support.TransactionOperations;
 
-/** All mutations go through SchedulerClient so optimistic locking is respected. */
 public class ExecutionActions {
 
     private final SchedulerClient client;
@@ -35,11 +34,6 @@ public class ExecutionActions {
                 TransactionOperations.withoutTransaction());
     }
 
-    /**
-     * {@code transactions} must commit on the scheduler's DataSource. db-scheduler's client never
-     * commits when the pool hands out auto-commit=false connections; it relies on the caller's
-     * transaction instead.
-     */
     public ExecutionActions(SchedulerClient client, Clock clock,
             FailedExecutionRepository failedExecutions, Serializer serializer,
             List<Task<?>> tasks, TransactionOperations transactions) {

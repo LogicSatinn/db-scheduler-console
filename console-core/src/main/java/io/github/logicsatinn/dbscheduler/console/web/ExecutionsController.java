@@ -80,7 +80,6 @@ public class ExecutionsController {
         model.put("taskNames", executions.distinctTaskNames());
         model.put("now", now);
         model.put("queryBase", queryBase(state, task, q, from, to, size));
-        // Path only: an absolute URL breaks behind a TLS-terminating proxy (htmx refuses cross-origin).
         model.put("refreshUrl", request.getRequestURI() + queryBase(state, task, q, from, to, size)
                 + "&sort=" + sortColumn.name() + "&dir=" + (desc ? "desc" : "asc")
                 + "&page=" + Math.max(0, page));
@@ -93,7 +92,6 @@ public class ExecutionsController {
         var row = executions.find(task, id);
         var historyEntries = stats.historyAvailable() ? history.forInstance(task, id, 50) : List.<HistoryEntry>of();
         if (row.isEmpty()) {
-            // Finished executions leave the live table; show their outcome instead of a dead end.
             var gone = Map.<String, Object>of(
                     "ctx", ctxFactory.page("executions", request),
                     "taskName", task,
@@ -114,7 +112,6 @@ public class ExecutionsController {
         return templates.page("pages/executionDetail.jte", model);
     }
 
-    /** Query string with every filter except page — pagination/sort links append to it. */
     private static String queryBase(String state, String task, String q, String from, String to, int size) {
         StringBuilder sb = new StringBuilder("?size=").append(size);
         appendParam(sb, "state", state);

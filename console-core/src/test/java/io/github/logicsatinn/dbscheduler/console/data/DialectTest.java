@@ -17,7 +17,6 @@ class DialectTest {
         assertThat(Dialect.fromProductName("PostgreSQL")).contains(Dialect.POSTGRES);
         assertThat(Dialect.fromProductName("MySQL")).contains(Dialect.MYSQL);
         assertThat(Dialect.fromProductName("MariaDB")).contains(Dialect.MARIADB);
-        // MariaDB servers can report "MySQL" wire compat strings that include "MariaDB"
         assertThat(Dialect.fromProductName("MySQL (MariaDB fork)")).contains(Dialect.MARIADB);
         assertThat(Dialect.fromProductName("Microsoft SQL Server")).contains(Dialect.SQLSERVER);
         assertThat(Dialect.fromProductName("Oracle")).contains(Dialect.ORACLE);

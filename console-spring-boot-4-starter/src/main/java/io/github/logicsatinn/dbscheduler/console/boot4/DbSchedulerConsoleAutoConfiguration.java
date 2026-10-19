@@ -69,8 +69,6 @@ public class DbSchedulerConsoleAutoConfiguration {
     ExecutionActions dbSchedulerConsoleExecutionActions(Scheduler scheduler,
             FailedExecutionRepository failedExecutions, List<Task<?>> tasks,
             ObjectProvider<DbSchedulerCustomizer> customizer, DataSource dataSource) {
-        // db-scheduler's client never commits on auto-commit=false connections, so the console
-        // supplies the transaction, on the same DataSource the scheduler was built with.
         DataSource schedulerDataSource = customizer.stream()
                 .flatMap(candidate -> candidate.dataSource().stream())
                 .findFirst()

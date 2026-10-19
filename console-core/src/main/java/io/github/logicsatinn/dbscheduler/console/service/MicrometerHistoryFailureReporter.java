@@ -7,7 +7,6 @@ import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
-/** Creates a counter-backed reporter when an application provides Micrometer. */
 public final class MicrometerHistoryFailureReporter {
 
     private static final Logger LOG = LoggerFactory.getLogger(MicrometerHistoryFailureReporter.class);

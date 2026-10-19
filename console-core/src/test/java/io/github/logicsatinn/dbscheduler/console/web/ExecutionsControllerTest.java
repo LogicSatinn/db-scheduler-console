@@ -76,9 +76,7 @@ class ExecutionsControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(doc.select("#executions-region tbody tr")).hasSize(1);
         assertThat(doc.select("#executions-region tbody").text()).contains("running");
-        // filter form present, URL-synced
         assertThat(doc.select("form[hx-push-url=true]")).hasSize(1);
-        // checkbox refs for bulk selection
         assertThat(doc.select("input[name=ref]").attr("value")).isEqualTo("email::running");
     }
 
@@ -89,13 +87,12 @@ class ExecutionsControllerTest {
         }
         var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?q=i-2&size=10"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertThat(doc.select("#executions-region tbody tr")).hasSize(10); // i-20 … i-29
+        assertThat(doc.select("#executions-region tbody tr")).hasSize(10);
         assertThat(doc.select(".pagination").text()).contains("Page 1 of 1");
 
         var page2 = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?size=10&page=1"))
                 .andReturn().getResponse().getContentAsString());
         assertThat(page2.select(".pagination").text()).contains("Page 2 of 3");
-        // sort header link toggles direction
         assertThat(page2.select("th a[href*='sort=EXECUTION_TIME']").attr("href")).contains("dir=desc");
     }
 

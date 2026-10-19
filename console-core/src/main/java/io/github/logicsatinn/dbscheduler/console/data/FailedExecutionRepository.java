@@ -18,7 +18,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Persistence for one-time executions parked after their retry policy is exhausted. */
 public class FailedExecutionRepository {
 
     public static final String TABLE = "dsc_failed_execution";
@@ -96,10 +95,6 @@ public class FailedExecutionRepository {
         return count == null ? 0 : count;
     }
 
-    /**
-     * Atomically copies the exact serialized live payload into the parking table and removes
-     * the picked row. Any failure rolls the insert back and leaves the live row authoritative.
-     */
     public void park(ExecutionComplete complete, String taskDataType) {
         transaction.executeWithoutResult(status -> {
             Execution execution = complete.getExecution();
@@ -133,7 +128,6 @@ public class FailedExecutionRepository {
         });
     }
 
-    /** Inserts the parked payload back into db-scheduler and removes it atomically. */
     public boolean requeue(ExecutionRow failed, Instant executionTime) {
         Boolean result = transaction.execute(status -> {
             String payloadValue = dialect == Dialect.SQLSERVER

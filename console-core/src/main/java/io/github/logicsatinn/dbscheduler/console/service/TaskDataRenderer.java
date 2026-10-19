@@ -6,7 +6,6 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
-/** Renders task_data bytes for humans without pretending to decode what it cannot. */
 public class TaskDataRenderer {
 
     static final int MAX_CHARS = 10000;
@@ -33,7 +32,6 @@ public class TaskDataRenderer {
                     return cap(String.valueOf(o));
                 }
             } catch (RuntimeException ignored) {
-                // fall through to the UTF-8 heuristic
             }
         }
         String text = tryPrintableUtf8(taskData);

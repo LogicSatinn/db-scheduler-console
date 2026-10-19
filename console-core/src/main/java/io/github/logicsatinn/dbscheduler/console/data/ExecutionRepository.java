@@ -17,10 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 public class ExecutionRepository {
 
-    /** db-scheduler's own default when {@code db-scheduler.table-name} is not configured. */
     public static final String DEFAULT_TABLE_NAME = "scheduled_tasks";
 
-    /** A bare identifier, optionally schema-qualified. */
     private static final Pattern TABLE_NAME =
             Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?$");
 
@@ -38,10 +36,6 @@ public class ExecutionRepository {
         this.dialect = dialect;
     }
 
-    /**
-     * The table name is concatenated into every query, so it is the one identifier a
-     * deployment can inject into our SQL. Fail fast at startup rather than quote per dialect.
-     */
     static String validateTableName(String tableName) {
         if (tableName == null || !TABLE_NAME.matcher(tableName).matches()) {
             throw new IllegalArgumentException(
@@ -98,7 +92,6 @@ public class ExecutionRepository {
         return result.stream().filter(java.util.Objects::nonNull).findFirst();
     }
 
-    /** Earliest unpicked execution per task, batched — the recurring page needs one per task. */
     public Map<String, Instant> nextExecutionTimes() {
         Map<String, Instant> byTask = new HashMap<>();
         jdbc.query("SELECT task_name, MIN(execution_time) AS next_time FROM " + table
@@ -180,7 +173,6 @@ public class ExecutionRepository {
         }
     }
 
-    /** Adds a param and returns "" so it can be chained inside append(). */
     private static String add(List<Object> params, Object value) {
         params.add(value);
         return "";

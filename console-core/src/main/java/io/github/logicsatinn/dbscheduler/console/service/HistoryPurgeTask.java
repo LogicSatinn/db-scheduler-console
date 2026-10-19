@@ -10,7 +10,6 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Daily recurring db-scheduler task that enforces history retention. */
 public final class HistoryPurgeTask {
 
     public static final String NAME = "console-history-purge";
@@ -25,10 +24,6 @@ public final class HistoryPurgeTask {
                 .execute((instance, ctx) -> purge(history, availability, retention, clock));
     }
 
-    /**
-     * The history table is optional and may be created after the app first starts, so the
-     * check is repeated on every daily run rather than cached.
-     */
     private static void purge(HistoryRepository history, ConsoleAvailability availability,
             Duration retention, Clock clock) {
         if (!availability.available()) {
