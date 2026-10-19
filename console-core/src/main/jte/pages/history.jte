@@ -9,7 +9,7 @@
 @param String upgradeScript
 @param String queryBase
 @template.layout(ctx = ctx, title = "History", content = @`
-    <h1>Execution history</h1>
+    <h1>History</h1>
     @if(legacy)
         <div class="card">
             <h2>Upgrade required</h2>
@@ -24,7 +24,7 @@
           hx-push-url="true"
           hx-trigger="change, submit, input delay:500ms from:'find input[name=q]'">
         <label>Task
-            <input type="search" name="task" value="${filter.taskName()}" placeholder="task name">
+            <input type="search" name="task" value="${filter.taskName()}" placeholder="Task name">
         </label>
         <label>Outcome
             <select name="outcome">
@@ -33,11 +33,11 @@
                 <option value="FAILED" selected="${outcomeParam.equalsIgnoreCase("FAILED")}">Failed</option>
             </select>
         </label>
-        <label>Contains
-            <input type="search" name="q" value="${filter.textSearch()}" placeholder="instance or error text">
+        <label>Search
+            <input type="search" name="q" value="${filter.textSearch()}" placeholder="Instance ID or error message">
         </label>
-        <label>From <input type="datetime-local" name="from" value="${fromParam}"></label>
-        <label>To <input type="datetime-local" name="to" value="${toParam}"></label>
+        <label>Started from <input type="datetime-local" name="from" value="${fromParam}"></label>
+        <label>Started until <input type="datetime-local" name="to" value="${toParam}"></label>
         <input type="hidden" name="size" value="${filter.pageSize()}">
         <button type="submit">Apply</button>
     </form>

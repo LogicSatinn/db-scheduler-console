@@ -1,5 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.web;
 
+import io.github.logicsatinn.dbscheduler.console.data.ExecutionState;
+import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -21,6 +23,23 @@ public final class Fmt {
     public static String url(String value) {
         return value == null ? ""
                 : URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    public static String state(ExecutionState state) {
+        return switch (state) {
+            case SCHEDULED -> "Scheduled";
+            case DUE -> "Due";
+            case RUNNING -> "Running";
+            case RETRYING -> "Retrying";
+            case FAILED -> "Parked";
+        };
+    }
+
+    public static String outcome(HistoryEntry.Outcome outcome) {
+        return switch (outcome) {
+            case SUCCEEDED -> "Succeeded";
+            case FAILED -> "Failed";
+        };
     }
 
     public static String duration(long ms) {

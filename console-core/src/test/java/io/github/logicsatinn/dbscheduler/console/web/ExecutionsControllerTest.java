@@ -116,14 +116,14 @@ class ExecutionsControllerTest {
         var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?q=i-2&size=10"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(doc.select("#executions-region tbody tr")).hasSize(10);
-        assertThat(doc.select(".pagination").text()).contains("10 entries");
+        assertThat(doc.select(".pagination").text()).contains("Showing 10");
 
         var first = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?size=10"))
                 .andReturn().getResponse().getContentAsString());
         String next = first.select(".pagination a").last().attr("href");
         var page2 = Jsoup.parse(mvc.perform(get(URI.create(next)))
                 .andReturn().getResponse().getContentAsString());
-        assertThat(page2.select(".pagination").text()).contains("10 entries", "Previous", "Next");
+        assertThat(page2.select(".pagination").text()).contains("Showing 10", "Previous", "Next");
         assertThat(page2.select("th a[href*='sort=EXECUTION_TIME']").attr("href")).contains("dir=desc");
     }
 
@@ -143,7 +143,7 @@ class ExecutionsControllerTest {
         assertThat(mvc.perform(get(URI.create(payloadUrl))).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()).contains("orderId");
         assertThat(doc.select("details.stack pre").text()).contains("the-stack-trace");
-        assertThat(doc.text()).contains("SCHEDULED");
+        assertThat(doc.text()).contains("Scheduled");
     }
 
     @Test
@@ -224,7 +224,7 @@ class ExecutionsControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
 
         assertThat(doc.select("h1").text()).contains("email").contains("order-9");
-        assertThat(doc.select("#detail-live").text()).contains("Finished").contains("SUCCEEDED");
+        assertThat(doc.select("#detail-live").text()).contains("No longer scheduled").contains("Succeeded");
         assertThat(doc.select("#detail-live table.data tbody tr")).hasSize(1);
         assertThat(doc.select("[hx-trigger]")).isEmpty();
     }

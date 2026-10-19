@@ -20,7 +20,7 @@
             <select name="state">
                 <option value="">All</option>
                 @for(var s : io.github.logicsatinn.dbscheduler.console.data.ExecutionState.values())
-                    <option value="${s.name()}" selected="${s.name().equals(stateParam)}">${s.name()}</option>
+                    <option value="${s.name()}" selected="${s.name().equals(stateParam)}">${io.github.logicsatinn.dbscheduler.console.web.Fmt.state(s)}</option>
                 @endfor
             </select>
         </label>
@@ -40,13 +40,13 @@
                 @endfor
             </select>
         </label>
-        <label>Instance contains
-            <input type="search" name="q" value="${filter.instanceContains()}" placeholder="instance id">
+        <label>Instance ID
+            <input type="search" name="q" value="${filter.instanceContains()}" placeholder="Contains…">
         </label>
-        <label>From
+        <label>Scheduled from
             <input type="datetime-local" name="from" value="${fromParam}">
         </label>
-        <label>To
+        <label>Scheduled until
             <input type="datetime-local" name="to" value="${toParam}">
         </label>
         <input type="hidden" name="size" value="${filter.pageSize()}">

@@ -138,7 +138,7 @@ class RecurringControllerTest {
 
         var doc = page(props);
 
-        assertThat(doc.title()).isEqualTo("Recurring tasks · Payments scheduler");
+        assertThat(doc.title()).isEqualTo("Tasks · Payments scheduler");
         assertThat(doc.select(".nav .brand").text()).isEqualTo("Payments scheduler");
     }
 

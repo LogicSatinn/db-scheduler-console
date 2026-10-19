@@ -9,7 +9,7 @@
         @template.fragments.tiles(tiles = tiles, historyAvailable = historyAvailable)
     </div>
     <div class="card">
-        <h2>Throughput · last 24 h</h2>
+        <h2>Runs per hour · last 24 hours</h2>
         <div hx-get="${ctx.basePath()}/fragments/overview-chart" hx-trigger="every ${ctx.pollSeconds()}s" hx-swap="innerHTML">
             @template.fragments.chart(chart = chart)
         </div>

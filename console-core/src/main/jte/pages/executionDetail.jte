@@ -13,28 +13,28 @@
             <h2>Execution</h2>
             <table class="data">
                 <tbody>
-                <tr><th>State</th><td><span class="state ${row.state(now).name().toLowerCase()}">${row.state(now).name()}</span></td></tr>
-                <tr><th>Execution time</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.executionTime())}</td></tr>
-                <tr><th>Picked by</th><td>${row.pickedBy()}</td></tr>
+                <tr><th>State</th><td><span class="state ${row.state(now).name().toLowerCase()}">${io.github.logicsatinn.dbscheduler.console.web.Fmt.state(row.state(now))}</span></td></tr>
+                <tr><th>Scheduled for</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.executionTime())}</td></tr>
+                <tr><th>Node</th><td>${row.pickedBy()}</td></tr>
                 <tr><th>Consecutive failures</th><td class="num">${row.consecutiveFailures()}</td></tr>
                 <tr><th>Last success</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastSuccess())}</td></tr>
                 <tr><th>Last failure</th><td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastFailure())}</td></tr>
-                <tr><th>Version</th><td class="num">${row.version()}</td></tr>
+                <tr><th>Row version</th><td class="num">${row.version()}</td></tr>
                 <tr><th>Priority</th><td class="num">${row.priority()}</td></tr>
                 </tbody>
             </table>
         </div>
         <div class="card">
-            <h2>Task data</h2>
+            <h2>Payload</h2>
             @if(payloadVisible)
-                <details data-payload-url="${ctx.basePath()}/payload/execution?task=${io.github.logicsatinn.dbscheduler.console.web.Fmt.url(row.taskName())}&id=${io.github.logicsatinn.dbscheduler.console.web.Fmt.url(row.instanceId())}"><summary>View payload</summary><pre>Open to load</pre></details>
+                <details data-payload-url="${ctx.basePath()}/payload/execution?task=${io.github.logicsatinn.dbscheduler.console.web.Fmt.url(row.taskName())}&id=${io.github.logicsatinn.dbscheduler.console.web.Fmt.url(row.instanceId())}"><summary>Show payload</summary><pre>Loads when opened</pre></details>
             @else
-                <p>Payloads are hidden</p>
+                <p class="muted">Payload display is turned off. Set <code>db-scheduler-console.task-data.visible=true</code> to show it.</p>
             @endif
         </div>
         @if(row.parked() && row.exceptionClass() != null)
             <div class="card">
-                <h2>Terminal failure</h2>
+                <h2>Final error</h2>
                 <p><strong>${row.exceptionClass()}</strong>: ${row.exceptionMessage()}</p>
                 @if(row.stacktrace() != null)
                     <pre class="data">${row.stacktrace()}</pre>

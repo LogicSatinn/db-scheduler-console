@@ -5,7 +5,7 @@
     <div class="empty">No recent failures.</div>
 @else
     <table class="data" id="recent-failures">
-        <thead><tr><th>Task</th><th>Instance</th><th>When</th><th>Error</th></tr></thead>
+        <thead><tr><th>Task</th><th>Instance ID</th><th>Started at</th><th>Error</th></tr></thead>
         <tbody>
         @for(var f : failures)
             <tr>

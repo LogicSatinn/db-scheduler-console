@@ -18,10 +18,10 @@
         <span class="brand">${ctx.title()}</span>
         <a href="${ctx.basePath()}/overview" class="@if(ctx.active().equals("overview"))active@endif">Overview</a>
         <a href="${ctx.basePath()}/executions" class="@if(ctx.active().equals("executions"))active@endif">Executions</a>
-        <a href="${ctx.basePath()}/recurring" class="@if(ctx.active().equals("recurring"))active@endif">Recurring</a>
+        <a href="${ctx.basePath()}/recurring" class="@if(ctx.active().equals("recurring"))active@endif">Tasks</a>
         <a href="${ctx.basePath()}/history" class="@if(ctx.active().equals("history"))active@endif">History</a>
         <span class="nav-end">
-            @if(ctx.readOnly())<span class="badge">read-only</span>@endif
+            @if(ctx.readOnly())<span class="badge">Read-only</span>@endif
             <span class="live-status" data-live-status role="status">Live</span>
             <button type="button" class="live-toggle" data-live-toggle>Pause updates</button>
         </span>

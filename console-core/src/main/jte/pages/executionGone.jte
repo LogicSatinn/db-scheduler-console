@@ -7,14 +7,14 @@
     <div id="detail-live">
     @if(historyEntries.isEmpty())
         <div class="card">
-            <div class="empty">Execution not found: it is no longer scheduled and has no recorded history.</div>
+            <div class="empty">Execution not found. It is no longer scheduled and has no recorded history.</div>
         </div>
     @else
         !{var last = historyEntries.get(0);}
         <div class="card">
-            <h2>Finished</h2>
-            <p>No longer scheduled. Last outcome
-                <span class="state ${last.outcome().name().toLowerCase()}">${last.outcome().name()}</span>
+            <h2>No longer scheduled</h2>
+            <p>Last run
+                <span class="state ${last.outcome().name().toLowerCase()}">${io.github.logicsatinn.dbscheduler.console.web.Fmt.outcome(last.outcome())}</span>
                 <span class="muted">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(last.finishedAt())}</span></p>
         </div>
         @template.fragments.instanceHistory(historyEntries = historyEntries)

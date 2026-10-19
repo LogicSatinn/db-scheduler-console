@@ -1,6 +1,6 @@
 @param io.github.logicsatinn.dbscheduler.console.web.ChartVm.Model chart
 @if(chart.empty())
-    <div class="empty">No execution history yet — history powers this chart.</div>
+    <div class="empty">No runs recorded yet. This chart is built from execution history.</div>
 @else
     <svg class="chart-svg" viewBox="0 0 720 170" role="img" aria-label="Executions per hour, last 24 hours">
         @for(var g : chart.gridLines())

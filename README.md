@@ -5,9 +5,10 @@ JobRunr's UI. Server-rendered with [JTE](https://jte.gg) + [htmx](https://htmx.o
 React, no Node build, no CDN calls. Add one starter dependency and open
 `/db-scheduler-console`.
 
-**Views:** overview (stat tiles, 24h throughput chart, recent failures) · executions
-(filter/search/sort/paginate, run-now, reschedule, delete, bulk) · execution detail
-(task data, per-instance history, stack traces) · recurring task definitions ·
+**Views:** overview (stat tiles, 24h runs-per-hour chart, recent failures) · executions
+(filter by state, task type, task, instance and time; sort/paginate, run-now, reschedule, delete,
+bulk) · execution detail (payload, per-instance run history, stack traces) · tasks (every registered
+task, with run-now for one or several recurring tasks) ·
 searchable payload-aware execution history · retrying and parked-failure states · transactional
 requeue/delete actions.
 
