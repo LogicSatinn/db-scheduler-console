@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -57,9 +58,14 @@ public class ExecutionRepository {
     }
 
     public Page<ExecutionRow> page(ExecutionFilter f, Instant now, boolean includeFailed) {
+        return page(f, now, includeFailed, null);
+    }
+
+    public Page<ExecutionRow> page(ExecutionFilter f, Instant now, boolean includeFailed,
+            Collection<String> kindTaskNames) {
         int size = Keyset.size(f.pageSize());
         String scope = Keyset.scope("executions", f.state(), f.taskName(), f.instanceContains(),
-                f.from(), f.to(), size, f.sort(), f.descending());
+                f.from(), f.to(), size, f.sort(), f.descending(), f.kind());
         Keyset.Cursor cursor = Keyset.decode(f.cursor(), scope, 4);
         String primary = f.sort().column();
         Class<?> type = switch (f.sort()) {
@@ -79,6 +85,7 @@ public class ExecutionRepository {
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
         applyFilter(f, now, where, params);
+        if (f.kind() != null) appendTaskNamesIn(kindTaskNames, where, params);
         boolean backwards = cursor != null && cursor.backwards();
         if (cursor != null) Keyset.seek(where, params, keys, backwards, dialect);
         String liveColumns = "task_name, task_instance, execution_time, picked, picked_by, "
@@ -197,6 +204,18 @@ public class ExecutionRepository {
             where.append(" AND execution_time <= ?");
             params.add(dialect.jdbcTimestamp(f.to()));
         }
+    }
+
+    private static void appendTaskNamesIn(Collection<String> names, StringBuilder where,
+            List<Object> params) {
+        if (names == null || names.isEmpty()) {
+            where.append(" AND 1=0");
+            return;
+        }
+        where.append(" AND task_name IN (")
+                .append(String.join(", ", java.util.Collections.nCopies(names.size(), "?")))
+                .append(")");
+        params.addAll(names);
     }
 
     private void appendStateCondition(ExecutionState state, Instant now,

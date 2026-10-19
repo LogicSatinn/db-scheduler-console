@@ -1,6 +1,7 @@
 @param io.github.logicsatinn.dbscheduler.console.web.PageCtx ctx
 @param io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter filter
 @param String stateParam
+@param String typeParam
 @param String fromParam
 @param String toParam
 @param io.github.logicsatinn.dbscheduler.console.data.Page<io.github.logicsatinn.dbscheduler.console.data.ExecutionRow> page
@@ -20,6 +21,14 @@
                 <option value="">All</option>
                 @for(var s : io.github.logicsatinn.dbscheduler.console.data.ExecutionState.values())
                     <option value="${s.name()}" selected="${s.name().equals(stateParam)}">${s.name()}</option>
+                @endfor
+            </select>
+        </label>
+        <label>Type
+            <select name="type">
+                <option value="">All</option>
+                @for(var k : io.github.logicsatinn.dbscheduler.console.data.TaskKind.values())
+                    <option value="${k.name()}" selected="${k.name().equals(typeParam)}">${k.label()}</option>
                 @endfor
             </select>
         </label>

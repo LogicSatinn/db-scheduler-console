@@ -81,6 +81,30 @@ class ExecutionRepositoryTest {
     }
 
     @Test
+    void filtersByTaskKindUsingTheGivenTaskNames() {
+        insert("cleanup", "recurring", NOW.plus(10, ChronoUnit.MINUTES), false, null, 0);
+        insert("email-send", "order-1", NOW.plus(20, ChronoUnit.MINUTES), false, null, 0);
+        var recurring = new ExecutionFilter(null, null, null, null, null, null, 10,
+                SortColumn.EXECUTION_TIME, false, TaskKind.RECURRING);
+
+        assertThat(repo.page(recurring, NOW, false, List.of("cleanup")).items())
+                .extracting(ExecutionRow::taskName).containsExactly("cleanup");
+        assertThat(repo.page(recurring, NOW, false, List.of()).items()).isEmpty();
+        assertThat(repo.page(recurring, NOW, false, null).items()).isEmpty();
+    }
+
+    @Test
+    void taskKindIsPartOfTheCursorScope() {
+        for (int i = 0; i < 3; i++) insert("cleanup", "i-" + i, NOW.plus(i, ChronoUnit.MINUTES), false, null, 0);
+        var first = repo.page(new ExecutionFilter(null, null, null, null, null, null, 1,
+                SortColumn.EXECUTION_TIME, false, TaskKind.RECURRING), NOW, false, List.of("cleanup"));
+
+        assertThatThrownBy(() -> repo.page(new ExecutionFilter(null, null, null, null, null,
+                first.nextCursor(), 1, SortColumn.EXECUTION_TIME, false), NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void paginatesAndSorts() {
         for (int i = 0; i < 25; i++) {
             insert("bulk", "i-%02d".formatted(i), NOW.plus(i, ChronoUnit.MINUTES), false, null, 0);

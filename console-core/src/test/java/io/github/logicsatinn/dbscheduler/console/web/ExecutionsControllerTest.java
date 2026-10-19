@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.github.kagkarlsson.scheduler.task.helper.Tasks;
+import com.github.kagkarlsson.scheduler.task.schedule.FixedDelay;
 import io.github.logicsatinn.dbscheduler.console.ConsoleProperties;
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository;
@@ -20,6 +22,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import javax.sql.DataSource;
 import org.jsoup.Jsoup;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +57,9 @@ class ExecutionsControllerTest {
         props.setReadOnly(false);
         var controller = new ExecutionsController(
                 new PageCtxFactory(props), new TemplateRenderer(),
-                new ExecutionsService(repo, failed), history, new TaskDataRenderer(null, true),
+                new ExecutionsService(repo, failed, List.of(
+                        Tasks.recurring("cleanup", FixedDelay.ofHours(1)).execute((i, c) -> {}),
+                        Tasks.oneTime("email").execute((i, c) -> {}))), history, new TaskDataRenderer(null, true),
                 new StatsService(repo, failed, history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new ConsoleErrors())
@@ -80,6 +85,27 @@ class ExecutionsControllerTest {
         assertThat(doc.select("#executions-region tbody").text()).contains("running");
         assertThat(doc.select("form[hx-push-url=true]")).hasSize(1);
         assertThat(doc.select("input[name=ref]").attr("value")).isEqualTo("email::running");
+    }
+
+    @Test
+    void filtersByTaskTypeAndKeepsTheTypeInLinks() throws Exception {
+        insert("cleanup", "recurring", NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+        insert("email", "order-1", NOW.plus(2, ChronoUnit.HOURS), false, 0, null);
+        insert("unregistered", "x", NOW.plus(3, ChronoUnit.HOURS), false, 0, null);
+
+        var recurring = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?type=RECURRING"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(recurring.select("input[name=ref]").eachAttr("value")).containsExactly("cleanup::recurring");
+        assertThat(recurring.select("select[name=type] option[selected]").val()).isEqualTo("RECURRING");
+        assertThat(recurring.select("th a").eachAttr("href")).allMatch(href -> href.contains("type=RECURRING"));
+
+        var oneTime = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?type=ONE_TIME"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(oneTime.select("input[name=ref]").eachAttr("value")).containsExactly("email::order-1");
+
+        var all = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(all.select("input[name=ref]")).hasSize(3);
     }
 
     @Test
@@ -216,7 +242,7 @@ class ExecutionsControllerTest {
     @Test
     void malformedFiltersAndCursorReturnControlledBadRequests() throws Exception {
         for (String query : java.util.List.of("cursor=malformed", "size=2147483647", "size=-1", "sort=unknown",
-                "from=not-a-date", "dir=unknown", "state=unknown")) {
+                "from=not-a-date", "dir=unknown", "state=unknown", "type=unknown")) {
             mvc.perform(get("/db-scheduler-console/executions?" + query))
                     .andExpect(status().isBadRequest());
         }

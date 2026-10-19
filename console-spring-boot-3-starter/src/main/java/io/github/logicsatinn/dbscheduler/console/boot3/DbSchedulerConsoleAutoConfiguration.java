@@ -57,8 +57,8 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     ExecutionsService dbSchedulerConsoleExecutionsService(ExecutionRepository executions,
-            FailedExecutionRepository failedExecutions) {
-        return new ExecutionsService(executions, failedExecutions);
+            FailedExecutionRepository failedExecutions, List<Task<?>> tasks) {
+        return new ExecutionsService(executions, failedExecutions, tasks);
     }
 
     @Bean

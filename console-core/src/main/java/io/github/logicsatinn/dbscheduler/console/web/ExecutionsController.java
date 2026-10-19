@@ -4,6 +4,7 @@ import io.github.logicsatinn.dbscheduler.console.data.Keyset;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionFilter;
 import io.github.logicsatinn.dbscheduler.console.data.ExecutionState;
 import io.github.logicsatinn.dbscheduler.console.data.SortColumn;
+import io.github.logicsatinn.dbscheduler.console.data.TaskKind;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
@@ -54,6 +55,7 @@ public class ExecutionsController {
     public ResponseEntity<String> executions(
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String task,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -71,19 +73,21 @@ public class ExecutionsController {
                 parseEnum(ExecutionState.class, state, null),
                 blankToNull(task), blankToNull(q),
                 parseLocal(from), parseLocal(to),
-                cursor, Keyset.size(size), sortColumn, desc);
+                cursor, Keyset.size(size), sortColumn, desc,
+                parseEnum(TaskKind.class, type, null));
 
         Map<String, Object> model = new HashMap<>();
         model.put("ctx", ctxFactory.page("executions", request));
         model.put("filter", filter);
         model.put("stateParam", state == null ? "" : state);
+        model.put("typeParam", filter.kind() == null ? "" : filter.kind().name());
         model.put("fromParam", from == null ? "" : from);
         model.put("toParam", to == null ? "" : to);
         model.put("page", executions.page(filter, now));
         model.put("taskNames", executions.distinctTaskNames());
         model.put("now", now);
-        model.put("queryBase", queryBase(state, task, q, from, to, size));
-        model.put("refreshUrl", request.getRequestURI() + queryBase(state, task, q, from, to, size)
+        model.put("queryBase", queryBase(state, task, type, q, from, to, size));
+        model.put("refreshUrl", request.getRequestURI() + queryBase(state, task, type, q, from, to, size)
                 + "&sort=" + sortColumn.name() + "&dir=" + (desc ? "desc" : "asc")
                 + (cursor == null ? "" : "&cursor=" + Fmt.url(cursor)));
         return templates.page("pages/executions.jte", model);
@@ -121,10 +125,12 @@ public class ExecutionsController {
         return ResponseEntity.ok(taskData.render(executions.payload(task, id, TaskDataRenderer.MAX_BYTES)));
     }
 
-    private static String queryBase(String state, String task, String q, String from, String to, int size) {
+    private static String queryBase(String state, String task, String type, String q,
+            String from, String to, int size) {
         StringBuilder sb = new StringBuilder("?size=").append(size);
         appendParam(sb, "state", state);
         appendParam(sb, "task", task);
+        appendParam(sb, "type", type);
         appendParam(sb, "q", q);
         appendParam(sb, "from", from);
         appendParam(sb, "to", to);
