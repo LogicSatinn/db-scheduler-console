@@ -36,13 +36,10 @@ public class ConsoleProperties {
 
     public static class History {
         private boolean enabled = true;
-    private String title = "db-scheduler-console";
         private boolean storeTaskData = false;
         private Duration retention = Duration.ofDays(14);
 
-        public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public boolean isEnabled() { return enabled; }
+        public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public boolean isStoreTaskData() { return storeTaskData; }
         public void setStoreTaskData(boolean storeTaskData) { this.storeTaskData = storeTaskData; }
