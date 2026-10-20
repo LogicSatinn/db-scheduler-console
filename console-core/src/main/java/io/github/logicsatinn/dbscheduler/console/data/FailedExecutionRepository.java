@@ -6,8 +6,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataAccessException;
@@ -87,6 +91,15 @@ public class FailedExecutionRepository {
         return jdbc.query("SELECT " + COLUMNS + " FROM " + TABLE
                         + " WHERE task_name = ? AND task_instance = ?",
                 this::mapRow, taskName, instanceId).stream().findFirst();
+    }
+
+    public Set<InstanceKey> parked(Collection<InstanceKey> keys) {
+        if (keys.isEmpty() || !tableExists()) return Set.of();
+        List<Object> params = new ArrayList<>();
+        String sql = "SELECT task_name, task_instance FROM " + TABLE
+                + " WHERE " + InstanceKey.matching(keys, params);
+        return new HashSet<>(jdbc.query(sql, (rs, n) -> new InstanceKey(
+                rs.getString("task_name"), rs.getString("task_instance")), params.toArray()));
     }
 
     public List<String> distinctTaskNames() {

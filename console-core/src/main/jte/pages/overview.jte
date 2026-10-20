@@ -3,6 +3,7 @@
 @param boolean historyAvailable
 @param io.github.logicsatinn.dbscheduler.console.web.ChartVm.Model chart
 @param java.util.List<io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry> failures
+@param java.util.Map<Long, io.github.logicsatinn.dbscheduler.console.service.RetryLookup.Option> retries = java.util.Map.of()
 @template.layout(ctx = ctx, title = "Overview", content = @`
     <h1>Overview</h1>
     <div hx-get="${ctx.basePath()}/fragments/overview-tiles" hx-trigger="every ${ctx.pollSeconds()}s" hx-swap="innerHTML">
@@ -16,8 +17,8 @@
     </div>
     <div class="card">
         <h2>Recent failures</h2>
-        <div hx-get="${ctx.basePath()}/fragments/overview-recent" hx-trigger="every ${ctx.pollSeconds()}s" hx-swap="innerHTML">
-            @template.fragments.recentFailures(failures = failures, basePath = ctx.basePath())
+        <div hx-get="${ctx.basePath()}/fragments/overview-recent" hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body" hx-swap="innerHTML">
+            @template.fragments.recentFailures(ctx = ctx, failures = failures, retries = retries)
         </div>
     </div>
 `)

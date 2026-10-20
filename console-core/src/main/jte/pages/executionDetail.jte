@@ -44,10 +44,13 @@
         @if(!ctx.readOnly())
             <div class="card">
                 <h2>Actions</h2>
-                <form class="inline-form" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
+                !{var state = row.state(now);}
+                !{boolean failed = state == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.RETRYING
+                        || state == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.FAILED;}
+                <form class="inline-form" hx-post="${ctx.basePath()}/actions/${failed ? "retry" : "run-now"}" hx-target="#flash" hx-swap="innerHTML">
                     <input type="hidden" name="task" value="${row.taskName()}">
                     <input type="hidden" name="id" value="${row.instanceId()}">
-                    <button type="submit">${row.parked() ? "Requeue" : "Run now"}</button>
+                    <button type="submit">${failed ? "Retry" : "Run now"}</button>
                 </form>
                 @if(!row.parked())
                     <form class="inline-form" hx-post="${ctx.basePath()}/actions/reschedule" hx-target="#flash" hx-swap="innerHTML">

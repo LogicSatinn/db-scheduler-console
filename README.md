@@ -6,11 +6,11 @@ React, no Node build, no CDN calls. Add one starter dependency and open
 `/db-scheduler-console`.
 
 **Views:** overview (stat tiles, 24h runs-per-hour chart, recent failures) · executions
-(filter by state, task type, task, instance and time; sort/paginate, run-now, reschedule, delete,
-bulk) · execution detail (payload, per-instance run history, stack traces) · tasks (every registered
+(filter by state, task type, task, instance and time; sort/paginate, run-now, retry, reschedule,
+delete, bulk) · execution detail (payload, per-instance run history, stack traces) · tasks (every registered
 task, with run-now for one or several recurring tasks) ·
-searchable payload-aware execution history · retrying and parked-failure states · transactional
-requeue/delete actions.
+searchable payload-aware execution history · retrying and parked-failure states · retry and re-run
+of failed jobs · transactional requeue/delete actions.
 
 > **Status:** pre-release — the current version is the `0.1.1-M1` milestone. It is fully
 > functional, but details may still change before `0.1.1`.
@@ -78,6 +78,26 @@ After the third retry is exhausted, the terminal attempt atomically moves the pi
 `scheduled_tasks` to `dsc_failed_execution`. A parking failure rolls back and leaves the live row
 authoritative. The console resolves the current registered task and validates deserialization
 before atomically requeueing the same instance, payload, and priority.
+
+### Retrying failed jobs
+
+When `read-only=false`, failed jobs can be retried from the console:
+
+- **Retry** appears on Retrying and Parked executions (Executions list and execution detail) and on
+  the latest failed run of each instance on the History page and in the Overview's recent failures.
+  A Retrying execution is rescheduled to run now; a Parked one is requeued as described above.
+  Running executions and executions that have not failed are left alone.
+- **Retry failed** in the Executions bulk menu retries the selected rows and reports rows that had
+  not failed as skipped.
+- **Retry all matching** appears when the Executions list is filtered to Retrying or Parked. It
+  retries every execution matching the current filters, up to 1,000 per click, and says so when
+  more remain.
+- **Re-run** schedules a failed one-time run again after its execution is gone (for example when a
+  `maxRetries` handler without parking removed it). It needs
+  `db-scheduler-console.history.store-task-data=true` at the time of the failure, and is offered only
+  when that failure is the instance's latest recorded run and the task is still registered. The run
+  is scheduled under the same instance ID with the task's default priority, and its recorded payload
+  passes the same size and deserialization checks as requeue.
 
 ## Configuration
 
@@ -165,7 +185,8 @@ and grant the application database account only the required table permissions.
 Visibility and retention are independent and both default to false. `task-data.visible=true`
 allows lazy preview fetches on expansion; it does not enable storage. `history.store-task-data=true`
 enables storage; it does not grant UI access. Existing records are not removed when either setting
-is turned off. Parked payloads are needed for requeue and are retained independently.
+is turned off. Parked payloads are needed for requeue and are retained independently. History
+payloads are needed for re-run.
 
 The default preview never deserializes objects: it shows printable UTF-8 or binary metadata, reads
 at most 64 KiB plus one sentinel byte, and displays at most 10,000 characters. An explicit
@@ -183,7 +204,9 @@ A custom serializer is an explicit host trust boundary, not proof that its imple
 `FilteringJavaSerializer` is available for a per-stream policy. Supply an `ObjectInputFilter` with
 an explicit allowlist for the entire DTO graph (including required arrays and nested types), not
 blanket `java.*`/collection allowances. It rejects unlisted classes and enforces depth 20,
-10,000 references, array length 10,000 and input size 1 MiB. Requeue also caps input at 1 MiB.
+10,000 references, array length 10,000 and input size 1 MiB. Requeue and re-run also cap input at
+1 MiB, and re-run is refused under the default Java serializer without a host JVM filter, as
+requeue is.
 For example, adapt and review this pattern for your DTOs:
 
 ```java

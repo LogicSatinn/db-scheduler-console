@@ -8,6 +8,7 @@
 @param boolean legacy
 @param String upgradeScript
 @param String queryBase
+@param java.util.Map<Long, io.github.logicsatinn.dbscheduler.console.service.RetryLookup.Option> retries = java.util.Map.of()
 @template.layout(ctx = ctx, title = "History", content = @`
     <h1>History</h1>
     @if(legacy)
@@ -41,5 +42,5 @@
         <input type="hidden" name="size" value="${filter.pageSize()}">
         <button type="submit">Apply</button>
     </form>
-    @template.fragments.historyTable(ctx = ctx, page = page, filter = filter, queryBase = queryBase, taskData = taskData)
+    @template.fragments.historyTable(ctx = ctx, page = page, filter = filter, queryBase = queryBase, taskData = taskData, retries = retries)
 `)

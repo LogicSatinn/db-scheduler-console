@@ -198,6 +198,55 @@ public abstract class RepositoryContractTest {
     }
 
     @Test
+    void batchedRetryLookups() {
+        insertExecution("email", "retrying", NOW, false, 2);
+        insertExecution("email", "fresh", NOW, false, 0);
+        jdbc.update("insert into dsc_failed_execution"
+                        + " (task_name, task_instance, task_data, priority, failure_count, failed_at)"
+                        + " values (?, ?, null, 0, 4, ?)",
+                "email", "parked", dialect().jdbcTimestamp(NOW));
+        var retrying = new InstanceKey("email", "retrying");
+        var fresh = new InstanceKey("email", "fresh");
+        var parked = new InstanceKey("email", "parked");
+        var gone = new InstanceKey("email", "gone");
+        var keys = java.util.List.of(retrying, fresh, parked, gone);
+
+        var live = executions.metadata(keys);
+        assertThat(live).containsOnlyKeys(retrying, fresh);
+        assertThat(live.get(retrying).consecutiveFailures()).isEqualTo(2);
+        assertThat(live.get(retrying).picked()).isFalse();
+        assertThat(live.get(retrying).taskData()).isNull();
+        assertThat(executions.metadata(java.util.List.of())).isEmpty();
+
+        assertThat(failedExecutions.parked(keys)).containsExactly(parked);
+        assertThat(failedExecutions.parked(java.util.List.of())).isEmpty();
+
+        history.insert(new HistoryEntry(0, "email", "gone", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(60), NOW.minusSeconds(59), 1000,
+                "java.lang.RuntimeException", "first", "stack", "node-1"));
+        history.insert(new HistoryEntry(0, "email", "gone", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000,
+                "java.lang.RuntimeException", "second", "stack", "node-1",
+                new byte[] {4, 5, 6, 7, 8}, "example.PayloadV1"));
+        history.insert(new HistoryEntry(0, "email", "parked", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(20), NOW.minusSeconds(19), 1000, null, null, null, "node-1"));
+        long second = history.forInstance("email", "gone", 1).get(0).id();
+
+        var latest = history.latestIds(keys);
+        assertThat(latest).containsOnlyKeys(gone, parked);
+        assertThat(latest.get(gone)).isEqualTo(second);
+        assertThat(history.latestIds(java.util.List.of())).isEmpty();
+
+        var found = history.find(second, 65536).orElseThrow();
+        assertThat(found.instanceId()).isEqualTo("gone");
+        assertThat(found.outcome()).isEqualTo(HistoryEntry.Outcome.FAILED);
+        assertThat(found.taskDataType()).isEqualTo("example.PayloadV1");
+        assertThat(found.taskData()).containsExactly(4, 5, 6, 7, 8);
+        assertThat(history.find(second, 2).orElseThrow().taskData()).containsExactly(4, 5, 6);
+        assertThat(history.find(second + 1000, 65536)).isEmpty();
+    }
+
+    @Test
     void parkingAndRequeueAreTransactionalAndPreserveBinaryPayload() {
         byte[] payload = new byte[] {0, 7, -1, 42};
         insertExecution("portable", "failed", NOW, true, 3);

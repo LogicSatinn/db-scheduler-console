@@ -7,21 +7,31 @@
 @param String refreshUrl
 !{var base = ctx.basePath();}
 !{var sortDir = filter.descending() ? "asc" : "desc";}
+!{boolean failureFilter = filter.state() == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.RETRYING
+        || filter.state() == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.FAILED;}
 <div id="executions-region"
      hx-get="${refreshUrl}"
      hx-trigger="every ${ctx.pollSeconds()}s, dsc-refresh from:body"
      hx-select="#executions-region" hx-swap="outerHTML">
     @if(!ctx.readOnly())
-        <form id="bulk-form" hx-post="${ctx.basePath()}/actions/bulk" hx-target="#flash" hx-swap="innerHTML">
-            <div class="toolbar">
+        <div class="toolbar">
+            <form id="bulk-form" hx-post="${ctx.basePath()}/actions/bulk" hx-target="#flash" hx-swap="innerHTML">
                 <label for="bulk-kind" class="muted">With selected</label>
                 <select name="kind" id="bulk-kind">
                     <option value="RUN_NOW">Run now</option>
+                    <option value="RETRY">Retry failed</option>
                     <option value="DELETE">Delete</option>
                 </select>
                 <button type="submit">Apply</button>
-            </div>
-        </form>
+            </form>
+            @if(failureFilter)
+                <form hx-post="${base}/actions/retry-matching${queryBase}"
+                      hx-confirm="Retry every execution matching these filters (up to ${io.github.logicsatinn.dbscheduler.console.web.ActionsController.MAX_RETRY_MATCHING})?"
+                      hx-target="#flash" hx-swap="innerHTML">
+                    <button type="submit">Retry all matching</button>
+                </form>
+            @endif
+        </div>
     @endif
     <table class="data">
         <thead>
@@ -54,10 +64,12 @@
                 <td class="time">${io.github.logicsatinn.dbscheduler.console.web.Fmt.ts(row.lastHeartbeat())}</td>
                 <td>
                     @if(!ctx.readOnly())
-                        <form class="inline-form" hx-post="${ctx.basePath()}/actions/run-now" hx-target="#flash" hx-swap="innerHTML">
+                        !{boolean failed = state == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.RETRYING
+                                || state == io.github.logicsatinn.dbscheduler.console.data.ExecutionState.FAILED;}
+                        <form class="inline-form" hx-post="${ctx.basePath()}/actions/${failed ? "retry" : "run-now"}" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">
                             <input type="hidden" name="id" value="${row.instanceId()}">
-                            <button type="submit">${row.parked() ? "Requeue" : "Run now"}</button>
+                            <button type="submit">${failed ? "Retry" : "Run now"}</button>
                         </form>
                         <form class="inline-form" hx-post="${ctx.basePath()}/actions/delete" hx-confirm="Delete this execution?" hx-target="#flash" hx-swap="innerHTML">
                             <input type="hidden" name="task" value="${row.taskName()}">

@@ -132,6 +132,18 @@ public class ExecutionRepository {
                 + " WHERE task_name = ? AND task_instance = ?", this::mapRow, task, id).stream().findFirst();
     }
 
+    public Map<InstanceKey, ExecutionRow> metadata(Collection<InstanceKey> keys) {
+        if (keys.isEmpty()) return Map.of();
+        List<Object> params = new ArrayList<>();
+        String sql = "SELECT " + COLUMNS.replace("task_data,", "NULL AS task_data,") + " FROM " + table
+                + " WHERE " + InstanceKey.matching(keys, params);
+        Map<InstanceKey, ExecutionRow> rows = new HashMap<>();
+        for (ExecutionRow row : jdbc.query(sql, this::mapRow, params.toArray())) {
+            rows.put(new InstanceKey(row.taskName(), row.instanceId()), row);
+        }
+        return rows;
+    }
+
     public Optional<ExecutionRow> find(String taskName, String instanceId) {
         List<ExecutionRow> rows = jdbc.query(
                 "SELECT " + COLUMNS + " FROM " + table

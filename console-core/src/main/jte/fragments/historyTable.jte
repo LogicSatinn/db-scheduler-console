@@ -4,16 +4,17 @@
 @param io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter filter
 @param String queryBase
 @param io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer taskData
+@param java.util.Map<Long, io.github.logicsatinn.dbscheduler.console.service.RetryLookup.Option> retries = java.util.Map.of()
 !{boolean live = filter.cursor() == null;}
 <div id="history-region"
      hx-get="${live ? ctx.basePath() + "/history" + queryBase : null}"
-     hx-trigger="${live ? "every " + ctx.pollSeconds() + "s" : null}"
+     hx-trigger="${live ? "every " + ctx.pollSeconds() + "s, dsc-refresh from:body" : null}"
      hx-select="#history-region" hx-swap="outerHTML">
     <table class="data">
-        <thead><tr><th>Task</th><th>Instance ID</th><th>Outcome</th><th>Started at</th><th>Duration</th><th>Node</th><th>Payload</th><th>Error</th></tr></thead>
+        <thead><tr><th>Task</th><th>Instance ID</th><th>Outcome</th><th>Started at</th><th>Duration</th><th>Node</th><th>Payload</th><th>Error</th>@if(!ctx.readOnly())<th>Actions</th>@endif</tr></thead>
         <tbody>
         @if(page.items().isEmpty())
-            <tr><td colspan="8" class="empty">No runs match these filters.</td></tr>
+            <tr><td colspan="${ctx.readOnly() ? 8 : 9}" class="empty">No runs match these filters.</td></tr>
         @endif
         @for(var h : page.items())
             <tr>
@@ -35,6 +36,9 @@
                         ${h.exceptionMessage()}
                     @endif
                 </td>
+                @if(!ctx.readOnly())
+                    <td>@template.fragments.retryAction(ctx = ctx, entry = h, option = retries.get(h.id()))</td>
+                @endif
             </tr>
         @endfor
         </tbody>

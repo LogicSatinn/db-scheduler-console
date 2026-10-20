@@ -5,6 +5,7 @@ import io.github.logicsatinn.dbscheduler.console.data.Dialect;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryFilter;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
+import io.github.logicsatinn.dbscheduler.console.service.RetryLookup;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
@@ -29,14 +30,22 @@ public class HistoryController {
     private final HistoryRepository history;
     private final Dialect dialect;
     private final TaskDataRenderer taskData;
+    private final RetryLookup retries;
 
     public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
             HistoryRepository history, Dialect dialect, TaskDataRenderer taskData) {
+        this(ctxFactory, templates, history, dialect, taskData, null);
+    }
+
+    public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
+            HistoryRepository history, Dialect dialect, TaskDataRenderer taskData,
+            RetryLookup retries) {
         this.ctxFactory = ctxFactory;
         this.templates = templates;
         this.history = history;
         this.dialect = dialect;
         this.taskData = taskData;
+        this.retries = retries;
     }
 
     public HistoryController(PageCtxFactory ctxFactory, TemplateRenderer templates,
@@ -82,7 +91,10 @@ public class HistoryController {
         model.put("outcomeParam", outcome == null ? "" : outcome);
         model.put("fromParam", from == null ? "" : from);
         model.put("toParam", to == null ? "" : to);
-        model.put("page", history.page(filter));
+        var page = history.page(filter);
+        model.put("page", page);
+        model.put("retries", retries == null || ctx.readOnly()
+                ? Map.<Long, RetryLookup.Option>of() : retries.forHistory(page.items()));
         model.put("taskData", taskData);
         model.put("legacy", schema == HistoryRepository.Schema.LEGACY);
         model.put("upgradeScript", schema == HistoryRepository.Schema.LEGACY

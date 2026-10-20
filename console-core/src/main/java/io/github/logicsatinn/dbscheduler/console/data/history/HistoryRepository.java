@@ -1,6 +1,7 @@
 package io.github.logicsatinn.dbscheduler.console.data.history;
 
 import io.github.logicsatinn.dbscheduler.console.data.Dialect;
+import io.github.logicsatinn.dbscheduler.console.data.InstanceKey;
 import io.github.logicsatinn.dbscheduler.console.data.Page;
 import io.github.logicsatinn.dbscheduler.console.data.Keyset;
 import io.github.logicsatinn.dbscheduler.console.data.DiagnosticSanitizer;
@@ -14,10 +15,12 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.springframework.dao.DataAccessException;
@@ -170,6 +173,34 @@ public class HistoryRepository {
                 return in == null ? null : in.readNBytes(maxBytes + 1);
             } catch (IOException e) { throw new UncheckedIOException(e); }
         }, id);
+    }
+
+    public Optional<HistoryEntry> find(long id, int maxBytes) {
+        if (schema() != Schema.CURRENT) return Optional.empty();
+        return jdbc.query("SELECT " + columns() + ", task_data AS payload FROM " + TABLE + " WHERE id = ?",
+                (rs, n) -> {
+                    HistoryEntry e = mapRow(rs, n);
+                    byte[] data;
+                    try (var in = rs.getBinaryStream("payload")) {
+                        data = in == null ? null : in.readNBytes(maxBytes + 1);
+                    } catch (IOException ex) { throw new UncheckedIOException(ex); }
+                    return new HistoryEntry(e.id(), e.taskName(), e.instanceId(), e.outcome(),
+                            e.startedAt(), e.finishedAt(), e.durationMs(), e.exceptionClass(),
+                            e.exceptionMessage(), e.stacktrace(), e.pickedBy(), data, e.taskDataType());
+                }, id).stream().findFirst();
+    }
+
+    public Map<InstanceKey, Long> latestIds(Collection<InstanceKey> keys) {
+        if (keys.isEmpty()) return Map.of();
+        List<Object> params = new ArrayList<>();
+        String sql = "SELECT task_name, task_instance, MAX(id) AS latest_id FROM " + TABLE
+                + " WHERE " + InstanceKey.matching(keys, params) + " GROUP BY task_name, task_instance";
+        Map<InstanceKey, Long> latest = new HashMap<>();
+        jdbc.query(sql, rs -> {
+            latest.put(new InstanceKey(rs.getString("task_name"), rs.getString("task_instance")),
+                    rs.getLong("latest_id"));
+        }, params.toArray());
+        return latest;
     }
 
     public List<HistoryEntry> forInstance(String taskName, String instanceId, int limit) {

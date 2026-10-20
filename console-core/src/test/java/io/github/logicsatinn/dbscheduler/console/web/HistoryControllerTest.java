@@ -76,7 +76,7 @@ class HistoryControllerTest {
         assertThat(region.attr("hx-select")).isEqualTo("#history-region");
         assertThat(region.attr("hx-swap")).isEqualTo("outerHTML");
         assertThat(region.attr("hx-trigger"))
-                .isEqualTo("every 5s");
+                .isEqualTo("every 5s, dsc-refresh from:body");
     }
 
     @Test
@@ -112,5 +112,62 @@ class HistoryControllerTest {
         assertThat(doc.text()).contains("history table has not been created");
         assertThat(doc.select("pre").text()).contains("create table dsc_execution_history");
         assertThat(doc.text()).contains("H2");
+    }
+    @Test
+    void latestFailuresOfferRetryOrRerunWhenActionsAreEnabled() throws Exception {
+        var ds = new EmbeddedDatabaseBuilder()
+                .setType(EmbeddedDatabaseType.H2)
+                .generateUniqueName(true)
+                .addScript("db-scheduler-schema/h2.sql")
+                .addScript("db-scheduler-console/migrations/h2.sql")
+                .build();
+        var jdbc = new org.springframework.jdbc.core.JdbcTemplate(ds);
+        repo = new HistoryRepository(ds, Dialect.H2);
+        jdbc.update("insert into scheduled_tasks (task_name, task_instance, execution_time, picked,"
+                + " consecutive_failures, version) values ('email', 'retrying', ?, false, 2, 1)",
+                java.sql.Timestamp.from(NOW));
+        for (String id : new String[] {"retrying", "gone"}) {
+            repo.insert(new HistoryEntry(0, "email", id, HistoryEntry.Outcome.FAILED,
+                    NOW.minusSeconds(60), NOW.minusSeconds(58), 2000, "java.lang.RuntimeException",
+                    "smtp down", "the-stack", "n1", null, "java.lang.Void"));
+        }
+        repo.insert(new HistoryEntry(0, "email", "ok", HistoryEntry.Outcome.SUCCEEDED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000, null, null, null, "n1"));
+        long gone = repo.forInstance("email", "gone", 1).get(0).id();
+        var lookup = new io.github.logicsatinn.dbscheduler.console.service.RetryLookup(
+                new io.github.logicsatinn.dbscheduler.console.data.ExecutionRepository(ds, "scheduled_tasks", Dialect.H2),
+                new io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository(ds, "scheduled_tasks", Dialect.H2),
+                repo, java.util.List.of(com.github.kagkarlsson.scheduler.task.helper.Tasks.oneTime("email").execute((i, c) -> { })));
+
+        var writable = new ConsoleProperties();
+        writable.setReadOnly(false);
+        var doc = Jsoup.parse(mvc(writable, lookup).perform(get("/db-scheduler-console/history"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        var retry = doc.select("form[hx-post$=/actions/retry]");
+        assertThat(retry).hasSize(1);
+        assertThat(retry.select("input[name=task]").val()).isEqualTo("email");
+        assertThat(retry.select("input[name=id]").val()).isEqualTo("retrying");
+        assertThat(retry.select("button").text()).isEqualTo("Retry");
+        var rerun = doc.select("form[hx-post$=/actions/rerun]");
+        assertThat(rerun).hasSize(1);
+        assertThat(rerun.select("input[name=history]").val()).isEqualTo(String.valueOf(gone));
+        assertThat(rerun.select("button").text()).isEqualTo("Re-run");
+        assertThat(rerun.attr("hx-confirm")).isNotBlank();
+        assertThat(doc.select("#history-region thead th").last().text()).isEqualTo("Actions");
+        HtmxAssertions.actionFormsDoNotInheritRegionSelect(doc);
+
+        var readOnly = Jsoup.parse(mvc(new ConsoleProperties(), lookup).perform(get("/db-scheduler-console/history"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(readOnly.select("form[hx-post]")).isEmpty();
+        assertThat(readOnly.select("#history-region thead th").eachText()).doesNotContain("Actions");
+    }
+
+    MockMvc mvc(ConsoleProperties props, io.github.logicsatinn.dbscheduler.console.service.RetryLookup lookup) {
+        var controller = new HistoryController(new PageCtxFactory(props), new TemplateRenderer(), repo,
+                Dialect.H2, new io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer(null, false), lookup);
+        return MockMvcBuilders.standaloneSetup(controller)
+                .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")
+                .build();
     }
 }

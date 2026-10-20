@@ -10,6 +10,7 @@ import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
+import io.github.logicsatinn.dbscheduler.console.service.RetryLookup;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -38,10 +39,17 @@ public class ExecutionsController {
     private final TaskDataRenderer taskData;
     private final StatsService stats;
     private final Clock clock;
+    private final RetryLookup retries;
 
     public ExecutionsController(PageCtxFactory ctxFactory, TemplateRenderer templates,
             ExecutionsService executions, HistoryRepository history,
             TaskDataRenderer taskData, StatsService stats, Clock clock) {
+        this(ctxFactory, templates, executions, history, taskData, stats, clock, null);
+    }
+
+    public ExecutionsController(PageCtxFactory ctxFactory, TemplateRenderer templates,
+            ExecutionsService executions, HistoryRepository history,
+            TaskDataRenderer taskData, StatsService stats, Clock clock, RetryLookup retries) {
         this.ctxFactory = ctxFactory;
         this.templates = templates;
         this.executions = executions;
@@ -49,6 +57,7 @@ public class ExecutionsController {
         this.taskData = taskData;
         this.stats = stats;
         this.clock = clock;
+        this.retries = retries;
     }
 
     @GetMapping("/executions")
@@ -65,16 +74,9 @@ public class ExecutionsController {
             @RequestParam(defaultValue = "asc") String dir,
             HttpServletRequest request) {
         Instant now = clock.instant();
-        SortColumn sortColumn = parseEnum(SortColumn.class, sort, SortColumn.EXECUTION_TIME);
-        if (!"asc".equalsIgnoreCase(dir) && !"desc".equalsIgnoreCase(dir))
-            throw new IllegalArgumentException("Invalid sort direction");
-        boolean desc = "desc".equalsIgnoreCase(dir);
-        var filter = new ExecutionFilter(
-                parseEnum(ExecutionState.class, state, null),
-                blankToNull(task), blankToNull(q),
-                parseLocal(from), parseLocal(to),
-                cursor, Keyset.size(size), sortColumn, desc,
-                parseEnum(TaskKind.class, type, null));
+        var filter = filter(state, task, type, q, from, to, cursor, size, sort, dir);
+        SortColumn sortColumn = filter.sort();
+        boolean desc = filter.descending();
 
         Map<String, Object> model = new HashMap<>();
         model.put("ctx", ctxFactory.page("executions", request));
@@ -99,11 +101,21 @@ public class ExecutionsController {
         var row = executions.find(task, id);
         var historyEntries = stats.historyAvailable() ? history.forInstance(task, id, 50) : List.<HistoryEntry>of();
         if (row.isEmpty()) {
-            var gone = Map.<String, Object>of(
-                    "ctx", ctxFactory.page("executions", request),
-                    "taskName", task,
-                    "instanceId", id,
-                    "historyEntries", historyEntries);
+            var ctx = ctxFactory.page("executions", request);
+            Long rerunId = null;
+            if (retries != null && !ctx.readOnly() && !historyEntries.isEmpty()) {
+                var last = historyEntries.get(0);
+                if (retries.forHistory(List.of(last)).get(last.id()) == RetryLookup.Option.RERUN) {
+                    rerunId = last.id();
+                }
+            }
+            Map<String, Object> gone = new HashMap<>();
+            gone.put("ctx", ctx);
+            gone.put("taskName", task);
+            gone.put("instanceId", id);
+            gone.put("historyEntries", historyEntries);
+            gone.put("rerunId", rerunId);
+            gone.put("selfUrl", ctx.basePath() + "/execution?task=" + Fmt.url(task) + "&id=" + Fmt.url(id));
             return ResponseEntity.status(historyEntries.isEmpty() ? HttpStatus.NOT_FOUND : HttpStatus.OK)
                     .contentType(MediaType.valueOf("text/html;charset=UTF-8"))
                     .body(templates.render("pages/executionGone.jte", gone));
@@ -144,6 +156,19 @@ public class ExecutionsController {
         }
     }
 
+    static ExecutionFilter filter(String state, String task, String type, String q, String from,
+            String to, String cursor, int size, String sort, String dir) {
+        SortColumn sortColumn = parseEnum(SortColumn.class, sort, SortColumn.EXECUTION_TIME);
+        if (!"asc".equalsIgnoreCase(dir) && !"desc".equalsIgnoreCase(dir))
+            throw new IllegalArgumentException("Invalid sort direction");
+        return new ExecutionFilter(
+                parseEnum(ExecutionState.class, state, null),
+                blankToNull(task), blankToNull(q),
+                parseLocal(from), parseLocal(to),
+                cursor, Keyset.size(size), sortColumn, "desc".equalsIgnoreCase(dir),
+                parseEnum(TaskKind.class, type, null));
+    }
+
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, E fallback) {
         if (value == null || value.isBlank()) {
             return fallback;
@@ -155,7 +180,7 @@ public class ExecutionsController {
         }
     }
 
-    private Instant parseLocal(String value) {
+    private static Instant parseLocal(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }

@@ -117,4 +117,52 @@ class OverviewControllerTest {
         var empty = ChartVm.of(java.util.List.of());
         assertThat(empty.empty()).isTrue();
     }
+    @Test
+    void recentFailuresOfferRetryOrRerunWhenActionsAreEnabled() throws Exception {
+        var ds = new EmbeddedDatabaseBuilder()
+                .setType(EmbeddedDatabaseType.H2)
+                .generateUniqueName(true)
+                .addScript("db-scheduler-schema/h2.sql")
+                .addScript("db-scheduler-console/migrations/h2.sql")
+                .build();
+        history = new HistoryRepository(ds, Dialect.H2);
+        var live = new ExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
+        var failed = new io.github.logicsatinn.dbscheduler.console.data.FailedExecutionRepository(ds, "scheduled_tasks", Dialect.H2);
+        new org.springframework.jdbc.core.JdbcTemplate(ds).update("insert into dsc_failed_execution"
+                + " (task_name, task_instance, priority, failure_count, failed_at)"
+                + " values ('email', 'parked', 0, 4, ?)", java.sql.Timestamp.from(NOW));
+        for (String id : new String[] {"parked", "gone"}) {
+            history.insert(new HistoryEntry(0, "email", id, HistoryEntry.Outcome.FAILED,
+                    NOW.minusSeconds(100), NOW.minusSeconds(99), 1000, "java.lang.RuntimeException",
+                    "smtp down", "stack", "n1", null, "java.lang.Void"));
+        }
+        var lookup = new io.github.logicsatinn.dbscheduler.console.service.RetryLookup(live, failed, history,
+                java.util.List.of(com.github.kagkarlsson.scheduler.task.helper.Tasks.oneTime("email").execute((i, c) -> { })));
+        var props = new ConsoleProperties();
+        props.setReadOnly(false);
+        var controller = new OverviewController(new PageCtxFactory(props), new TemplateRenderer(),
+                new StatsService(live, failed, history, Clock.fixed(NOW, ZoneOffset.UTC)), history, lookup);
+        var writable = MockMvcBuilders.standaloneSetup(controller)
+                .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")
+                .build();
+
+        for (String path : new String[] {"/db-scheduler-console/overview", "/db-scheduler-console/fragments/overview-recent"}) {
+            var doc = Jsoup.parse(writable.perform(get(path))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertThat(doc.select("#recent-failures form[hx-post$=/actions/retry] input[name=id]").val())
+                    .as(path).isEqualTo("parked");
+            assertThat(doc.select("#recent-failures form[hx-post$=/actions/rerun] button").text())
+                    .as(path).isEqualTo("Re-run");
+        }
+        var page = Jsoup.parse(writable.perform(get("/db-scheduler-console/overview"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(page.select("[hx-get$=/fragments/overview-recent]").attr("hx-trigger"))
+                .isEqualTo("every 5s, dsc-refresh from:body");
+
+        props.setReadOnly(true);
+        var readOnly = Jsoup.parse(writable.perform(get("/db-scheduler-console/overview"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(readOnly.select("#recent-failures tbody tr")).hasSize(2);
+        assertThat(readOnly.select("#recent-failures form")).isEmpty();
+    }
 }

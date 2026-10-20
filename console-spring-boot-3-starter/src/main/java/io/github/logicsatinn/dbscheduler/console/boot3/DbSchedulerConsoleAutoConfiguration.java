@@ -15,6 +15,7 @@ import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.ExecutionActions;
 import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
 import io.github.logicsatinn.dbscheduler.console.service.RecurringTasksService;
+import io.github.logicsatinn.dbscheduler.console.service.RetryLookup;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import io.github.logicsatinn.dbscheduler.console.web.ActionsController;
@@ -70,15 +71,21 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     ExecutionActions dbSchedulerConsoleExecutionActions(Scheduler scheduler,
-            FailedExecutionRepository failedExecutions, List<Task<?>> tasks,
+            FailedExecutionRepository failedExecutions, HistoryRepository history, List<Task<?>> tasks,
             ObjectProvider<DbSchedulerCustomizer> customizer, DataSource dataSource) {
         DataSource schedulerDataSource = customizer.stream()
                 .flatMap(candidate -> candidate.dataSource().stream())
                 .findFirst()
                 .orElse(dataSource);
-        return new ExecutionActions(scheduler, CLOCK, failedExecutions,
+        return new ExecutionActions(scheduler, CLOCK, failedExecutions, history,
                 effectiveSerializer(customizer), tasks,
                 new TransactionTemplate(new DataSourceTransactionManager(schedulerDataSource)));
+    }
+
+    @Bean
+    RetryLookup dbSchedulerConsoleRetryLookup(ExecutionRepository executions,
+            FailedExecutionRepository failedExecutions, HistoryRepository history, List<Task<?>> tasks) {
+        return new RetryLookup(executions, failedExecutions, history, tasks);
     }
 
     @Bean
@@ -107,15 +114,17 @@ public class DbSchedulerConsoleAutoConfiguration {
 
     @Bean
     OverviewController dbSchedulerConsoleOverviewController(PageCtxFactory ctx,
-            TemplateRenderer templates, StatsService stats, HistoryRepository history) {
-        return new OverviewController(ctx, templates, stats, history);
+            TemplateRenderer templates, StatsService stats, HistoryRepository history,
+            RetryLookup retries) {
+        return new OverviewController(ctx, templates, stats, history, retries);
     }
 
     @Bean
     ExecutionsController dbSchedulerConsoleExecutionsController(PageCtxFactory ctx,
             TemplateRenderer templates, ExecutionsService executions, HistoryRepository history,
-            TaskDataRenderer taskData, StatsService stats) {
-        return new ExecutionsController(ctx, templates, executions, history, taskData, stats, CLOCK);
+            TaskDataRenderer taskData, StatsService stats, RetryLookup retries) {
+        return new ExecutionsController(ctx, templates, executions, history, taskData, stats, CLOCK,
+                retries);
     }
 
     @Bean
@@ -127,15 +136,15 @@ public class DbSchedulerConsoleAutoConfiguration {
     @Bean
     HistoryController dbSchedulerConsoleHistoryController(PageCtxFactory ctx,
             TemplateRenderer templates, HistoryRepository history, ConsoleAvailability availability,
-            TaskDataRenderer taskData) {
+            TaskDataRenderer taskData, RetryLookup retries) {
         return new HistoryController(ctx, templates, history,
-                availability.dialectOrFallback(), taskData);
+                availability.dialectOrFallback(), taskData, retries);
     }
 
     @Bean
     ActionsController dbSchedulerConsoleActionsController(ConsoleProperties props,
-            TemplateRenderer templates, ExecutionActions actions) {
-        return new ActionsController(props, templates, actions);
+            TemplateRenderer templates, ExecutionActions actions, ExecutionsService executions) {
+        return new ActionsController(props, templates, actions, executions, CLOCK);
     }
 
     @Bean

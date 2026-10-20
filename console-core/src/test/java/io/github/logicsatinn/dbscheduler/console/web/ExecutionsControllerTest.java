@@ -14,6 +14,7 @@ import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import io.github.logicsatinn.dbscheduler.console.service.ExecutionsService;
+import io.github.logicsatinn.dbscheduler.console.service.RetryLookup;
 import io.github.logicsatinn.dbscheduler.console.service.TaskDataRenderer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -55,13 +56,14 @@ class ExecutionsControllerTest {
         history = new HistoryRepository(ds, Dialect.H2);
         var props = new ConsoleProperties();
         props.setReadOnly(false);
+        List<com.github.kagkarlsson.scheduler.task.Task<?>> tasks = List.of(
+                Tasks.recurring("cleanup", FixedDelay.ofHours(1)).execute((i, c) -> {}),
+                Tasks.oneTime("email").execute((i, c) -> {}));
         var controller = new ExecutionsController(
                 new PageCtxFactory(props), new TemplateRenderer(),
-                new ExecutionsService(repo, failed, List.of(
-                        Tasks.recurring("cleanup", FixedDelay.ofHours(1)).execute((i, c) -> {}),
-                        Tasks.oneTime("email").execute((i, c) -> {}))), history, new TaskDataRenderer(null, true),
+                new ExecutionsService(repo, failed, tasks), history, new TaskDataRenderer(null, true),
                 new StatsService(repo, failed, history, Clock.fixed(NOW, ZoneOffset.UTC)),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), new RetryLookup(repo, failed, history, tasks));
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new ConsoleErrors())
                 .addPlaceholderValue("db-scheduler-console.base-path", "/db-scheduler-console")
                 .build();
@@ -246,6 +248,102 @@ class ExecutionsControllerTest {
             mvc.perform(get("/db-scheduler-console/executions?" + query))
                     .andExpect(status().isBadRequest());
         }
+    }
+
+    void park(String task, String id) {
+        jdbc.update("insert into dsc_failed_execution (task_name, task_instance, priority,"
+                + " failure_count, failed_at) values (?, ?, 0, 4, ?)", task, id, Timestamp.from(NOW));
+    }
+
+    @Test
+    void failedExecutionsOfferRetryAndOthersRunNow() throws Exception {
+        insert("email", "retrying", NOW.plus(1, ChronoUnit.HOURS), false, 2, null);
+        insert("email", "fresh", NOW.plus(2, ChronoUnit.HOURS), false, 0, null);
+        park("email", "parked");
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertThat(doc.select("form[hx-post$=/actions/retry]:has(input[value=retrying]) button").text())
+                .isEqualTo("Retry");
+        assertThat(doc.select("form[hx-post$=/actions/retry]:has(input[value=parked]) button").text())
+                .isEqualTo("Retry");
+        assertThat(doc.select("form[hx-post$=/actions/run-now]:has(input[value=fresh]) button").text())
+                .isEqualTo("Run now");
+        assertThat(doc.select("form[hx-post$=/actions/run-now]:has(input[value=retrying])")).isEmpty();
+        assertThat(doc.select("#bulk-kind option").eachAttr("value"))
+                .containsExactly("RUN_NOW", "RETRY", "DELETE");
+        assertThat(doc.select("#bulk-kind option[value=RETRY]").text()).isEqualTo("Retry failed");
+    }
+
+    @Test
+    void retryAllMatchingAppearsOnlyWhenFilteringByAFailureState() throws Exception {
+        insert("email", "retrying", NOW.plus(1, ChronoUnit.HOURS), false, 2, null);
+
+        var retrying = Jsoup.parse(mvc.perform(get(
+                        "/db-scheduler-console/executions?state=RETRYING&task=email&q=ret"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var form = retrying.select("form[hx-post*=/actions/retry-matching]");
+        assertThat(form).hasSize(1);
+        assertThat(form.attr("hx-post"))
+                .startsWith("/db-scheduler-console/actions/retry-matching?")
+                .contains("state=RETRYING", "task=email", "q=ret");
+        assertThat(form.attr("hx-confirm")).isNotBlank();
+        assertThat(form.attr("hx-target")).isEqualTo("#flash");
+        assertThat(form.select("button").text()).isEqualTo("Retry all matching");
+
+        for (String query : new String[] {"", "?state=SCHEDULED", "?state=DUE"}) {
+            var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions" + query))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertThat(doc.select("form[hx-post*=/actions/retry-matching]")).as(query).isEmpty();
+        }
+        var parked = Jsoup.parse(mvc.perform(get("/db-scheduler-console/executions?state=FAILED"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(parked.select("form[hx-post*=/actions/retry-matching]")).hasSize(1);
+    }
+
+    @Test
+    void detailOffersRetryForAFailedExecution() throws Exception {
+        insert("email", "retrying", NOW.plus(1, ChronoUnit.HOURS), false, 2, null);
+        insert("email", "fresh", NOW.plus(1, ChronoUnit.HOURS), false, 0, null);
+
+        var failedDoc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=retrying"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var freshDoc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=fresh"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertThat(failedDoc.select("form[hx-post$=/actions/retry] button").text()).isEqualTo("Retry");
+        assertThat(failedDoc.select("form[hx-post$=/actions/run-now]")).isEmpty();
+        assertThat(freshDoc.select("form[hx-post$=/actions/run-now] button").text()).isEqualTo("Run now");
+        assertThat(freshDoc.select("form[hx-post$=/actions/retry]")).isEmpty();
+    }
+
+    @Test
+    void goneExecutionWhoseLastRunFailedOffersRerun() throws Exception {
+        history.insert(new HistoryEntry(0, "email", "order-9", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000, "java.lang.RuntimeException",
+                "boom", "stack", "node-1", null, "java.lang.Void"));
+        long id = history.forInstance("email", "order-9", 1).get(0).id();
+        history.insert(new HistoryEntry(0, "email", "order-10", HistoryEntry.Outcome.FAILED,
+                NOW.minusSeconds(30), NOW.minusSeconds(29), 1000, "java.lang.RuntimeException",
+                "boom", "stack", "node-1"));
+
+        var doc = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=order-9"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var form = doc.select("form[hx-post$=/actions/rerun]");
+        assertThat(form).hasSize(1);
+        assertThat(form.select("input[name=history]").val()).isEqualTo(String.valueOf(id));
+        assertThat(form.select("button").text()).isEqualTo("Re-run");
+        assertThat(form.attr("hx-confirm")).isNotBlank();
+        HtmxAssertions.actionFormsDoNotInheritRegionSelect(doc);
+        var region = doc.getElementById("detail-live");
+        assertThat(region.attr("hx-get")).isEqualTo("/db-scheduler-console/execution?task=email&id=order-9");
+        assertThat(region.attr("hx-trigger")).isEqualTo("dsc-refresh from:body");
+        assertThat(region.attr("hx-select")).isEqualTo("#detail-live");
+
+        var unrecorded = Jsoup.parse(mvc.perform(get("/db-scheduler-console/execution?task=email&id=order-10"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(unrecorded.select("form[hx-post]")).isEmpty();
     }
 
 }

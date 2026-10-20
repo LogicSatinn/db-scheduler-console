@@ -1,8 +1,11 @@
 package io.github.logicsatinn.dbscheduler.console.web;
 
+import io.github.logicsatinn.dbscheduler.console.data.history.HistoryEntry;
 import io.github.logicsatinn.dbscheduler.console.data.history.HistoryRepository;
+import io.github.logicsatinn.dbscheduler.console.service.RetryLookup;
 import io.github.logicsatinn.dbscheduler.console.service.StatsService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -17,13 +20,20 @@ public class OverviewController {
     private final TemplateRenderer templates;
     private final StatsService stats;
     private final HistoryRepository history;
+    private final RetryLookup retries;
 
     public OverviewController(PageCtxFactory ctxFactory, TemplateRenderer templates,
             StatsService stats, HistoryRepository history) {
+        this(ctxFactory, templates, stats, history, null);
+    }
+
+    public OverviewController(PageCtxFactory ctxFactory, TemplateRenderer templates,
+            StatsService stats, HistoryRepository history, RetryLookup retries) {
         this.ctxFactory = ctxFactory;
         this.templates = templates;
         this.stats = stats;
         this.history = history;
+        this.retries = retries;
     }
 
     @GetMapping({"", "/", "/overview"})
@@ -45,17 +55,30 @@ public class OverviewController {
 
     @GetMapping("/fragments/overview-recent")
     public ResponseEntity<String> recentFragment(HttpServletRequest request) {
+        var ctx = ctxFactory.page("overview", request);
+        var failures = recentFailures();
         return templates.page("fragments/recentFailures.jte", Map.of(
-                "failures", stats.historyAvailable() ? history.recentFailures(5) : java.util.List.of(),
-                "basePath", ctxFactory.page("overview", request).basePath()));
+                "ctx", ctx,
+                "failures", failures,
+                "retries", retryOptions(ctx, failures)));
     }
 
     private Map<String, Object> model(PageCtx ctx) {
+        var failures = recentFailures();
         return Map.of(
                 "ctx", ctx,
                 "tiles", stats.tiles(),
                 "historyAvailable", stats.historyAvailable(),
                 "chart", ChartVm.of(stats.throughputLast24h()),
-                "failures", stats.historyAvailable() ? history.recentFailures(5) : java.util.List.of());
+                "failures", failures,
+                "retries", retryOptions(ctx, failures));
+    }
+
+    private List<HistoryEntry> recentFailures() {
+        return stats.historyAvailable() ? history.recentFailures(5) : List.of();
+    }
+
+    private Map<Long, RetryLookup.Option> retryOptions(PageCtx ctx, List<HistoryEntry> failures) {
+        return retries == null || ctx.readOnly() ? Map.of() : retries.forHistory(failures);
     }
 }
