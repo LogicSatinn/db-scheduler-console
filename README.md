@@ -12,19 +12,19 @@ task, with run-now for one or several recurring tasks) ·
 searchable payload-aware execution history · retrying and parked-failure states · transactional
 requeue/delete actions.
 
-> **Status:** pre-release — the current version is the `0.1.0-M2` milestone. It is fully
-> functional, but details may still change before `0.1.0`.
+> **Status:** pre-release — the current version is the `0.1.1-M1` milestone. It is fully
+> functional, but details may still change before `0.1.1`.
 
 ## Quickstart
 
 Spring Boot 3:
 ```kotlin
-implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-3-starter:0.1.0-M2")
+implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-3-starter:0.1.1-M1")
 ```
 
 Spring Boot 4:
 ```kotlin
-implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-4-starter:0.1.0-M2")
+implementation("io.github.logicsatinn:db-scheduler-console-spring-boot-4-starter:0.1.1-M1")
 ```
 
 The starter brings in db-scheduler's own Spring Boot starter transitively — don't add a

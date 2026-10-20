@@ -7,7 +7,7 @@ plugins {
 
 allprojects {
     group = "io.github.logicsatinn"
-    version = "0.1.0-M2-SNAPSHOT"
+    version = "0.1.1-M1"
 
     tasks.withType<JavaCompile>().configureEach {
         options.compilerArgs.add("-parameters")
